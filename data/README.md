@@ -4,4 +4,4 @@
 
 1. NER-MSRA
 2. NER-People Daily
-3. vocab.txt: WWM哈工大中文预训练Bert的vocab file 
+3. CWS-MSR
