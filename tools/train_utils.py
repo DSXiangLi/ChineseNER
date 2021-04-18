@@ -104,7 +104,7 @@ def build_model_fn(model_name):
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
         # get model graph given above model_name
         build_graph = getattr(importlib.import_module('model.{}'.format(model_name)), 'build_graph')
-        loss, pred_ids, task_ids = build_graph(features=features, labels=labels, params=params, is_training=is_training)
+        loss, pred_ids = build_graph(features=features, labels=labels, params=params, is_training=is_training)
 
         if is_training:
             tf.summary.text('tokens', token2sequence(features['tokens'][0, :]))
