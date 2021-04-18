@@ -1,4 +1,4 @@
-## 中文NER的那些事儿
+# 中文NER的那些事儿
 
 Requirement: tf 1.14, seqeval 1.2.2
 ### 数据集
