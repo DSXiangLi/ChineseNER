@@ -48,10 +48,10 @@ python evaluation.py --model bert_crf,bert_bilstm_crf,bert_bilstm_crf_mtl_msra_m
 ```
 
 <p align="center">
-  <img src="https://files.mdnice.com/user/8955/876e6349-b6a4-4200-a88e-2f81ac529aa5.png" width="50%" />
+  <img src="https://files.mdnice.com/user/8955/876e6349-b6a4-4200-a88e-2f81ac529aa5.png" width="70%" />
 <p align="center"></p>
 
 <p align="center">
-  <img src="https://files.mdnice.com/user/8955/f1933585-6c5c-4d4a-9ea8-8f62813f7978.png" width="50%" />
+  <img src="https://files.mdnice.com/user/8955/f1933585-6c5c-4d4a-9ea8-8f62813f7978.png" width="70%" />
 <p align="center"></p>
 
