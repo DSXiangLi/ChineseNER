@@ -18,7 +18,7 @@ Requirement: tf 1.14, seqeval 1.2.2
 - bert_bilstm_crf_mtl: 共享Bert的多任务联合学习,部分参考 paper/Improving Named Entity Recognition for Chinese Social Media \
   with Word Segmentation Representation Learning
 - bert_bilstm_crf_adv: 对抗迁移联合学习,部分参考 paper/adversarial transfer learning for Chinese Named Entity Recognition \
-    with Self-Attention Mechanism
+ with Self-Attention Mechanism
 
 ### Run 
 1. pretrain_model中下载对应预训练模型到对应Folder，具体详见Folder中README.md
@@ -47,10 +47,10 @@ python evaluation.py --model bert_bilstm_crf_mtl_msra_msr --data msra ##注意�
 python evaluation.py --model bert_crf,bert_bilstm_crf,bert_bilstm_crf_mtl_msra_msr --data msra 
 ```
 <p align="center">
-  <img src="https://files.mdnice.com/user/8955/876e6349-b6a4-4200-a88e-2f81ac529aa5.png" heigh='400', width="500" />
+  <img src="https://files.mdnice.com/user/8955/876e6349-b6a4-4200-a88e-2f81ac529aa5.png" width="60%" />
 <p align="center"></p>
 
 <p align="center">
-  <img src="https://files.mdnice.com/user/8955/f1933585-6c5c-4d4a-9ea8-8f62813f7978.png" heigh='400', width="500" />
+  <img src="https://files.mdnice.com/user/8955/f1933585-6c5c-4d4a-9ea8-8f62813f7978.png" width="60%" />
 <p align="center"></p>
 
