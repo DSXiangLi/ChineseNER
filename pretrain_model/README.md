@@ -1,6 +1,6 @@
 ## 预训练模型
 
-下载预训练模型到当前Folder，受文件大小限制这里移除了checkpoint文件，请自行去以下链接下载完成模型。
+下载预训练模型到当前Folder，受文件大小限制这里移除了checkpoint文件，请自行去以下链接下载完整模型
 哈工大wwm bert的vocab文件和google bert一致，所以tokenizer加载哪个模型结果都是一样的。
 
 1. ch_google: Google bert base chinese，L-12_H-768

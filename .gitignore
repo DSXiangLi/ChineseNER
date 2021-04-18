@@ -1,5 +1,5 @@
-./checkpoint/
-./data/*/*.tfrecord
+checkpoint/*
+data/*/*.tfrecord
 .DS_Store
 .idea/
-
+pretrain_model/*/*.ckpt*
