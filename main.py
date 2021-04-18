@@ -73,7 +73,7 @@ def multitask_train(args):
     #Run Train & Evaluate
     early_stopping_hook = tf.estimator.experimental.stop_if_no_decrease_hook(
         estimator, metric_name='loss',
-        max_steps_without_decrease=int(TRAIN_PARAMS['num_train_steps'] * TRAIN_PARAMS['early_stop_ratio'])
+        max_steps_without_decrease=int(TRAIN_PARAMS['step_per_epoch'] * TRAIN_PARAMS['early_stop_ratio'])
     )
     train_spec = tf.estimator.TrainSpec(input_pipe.build_input_fn('train'), hooks=[early_stopping_hook])
     eval_spec = tf.estimator.EvalSpec(input_pipe.build_input_fn('valid'), throttle_secs=60)
