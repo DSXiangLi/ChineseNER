@@ -8,18 +8,17 @@ from tools.utils import add_layer_summary
 
 
 def build_rnn_cell(cell_type, activation, hidden_units_list, keep_prob_list, cell_size):
-    if cell_type.lower() == 'gru':
+    if cell_type.lower() == 'rnn':
+        cell_class = tf.nn.rnn_cell.RNNCell
+    elif cell_type.lower() == 'gru':
         cell_class = tf.nn.rnn_cell.GRUCell
     elif cell_type.lower() == 'lstm':
         cell_class = tf.nn.rnn_cell.LSTMCell
     else:
-        raise Exception('Only gru, lstm are supported as cell_type')
+        raise Exception('Only rnn, gru, lstm are supported as cell_type')
 
     return tf.nn.rnn_cell.MultiRNNCell(
-        cells = [ tf.nn.rnn_cell.DropoutWrapper(cell = cell_class(num_units = hidden_units_list[i],
-                                                                  activation=activation,
-                                                                  kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                                                  bias_initializer=tf.contrib.layers.xavier_initializer()),
+        cells = [ tf.nn.rnn_cell.DropoutWrapper(cell = cell_class(num_units = hidden_units_list[i], activation=activation),
                                                 output_keep_prob=keep_prob_list[i],
                                                 state_keep_prob=keep_prob_list[i]) for i in range(cell_size) ]
     )
