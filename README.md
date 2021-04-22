@@ -1,6 +1,7 @@
 # 中文NER的那些事儿
 
-Requirement: tf 1.14, seqeval 1.2.2
+Requirement: tensorflow 1.14, seqeval 1.2.2, bert-base 0.0.9
+
 ### 数据集
 细节详见data中README
 1. 实体识别: MSRA, people_daily
@@ -15,10 +16,8 @@ Requirement: tf 1.14, seqeval 1.2.2
 - bert_cnn_crf
 - bert_bilstm_crf_bigram
 2. 多任务
-- bert_bilstm_crf_mtl: 共享Bert的多任务联合学习,部分参考 paper/Improving Named Entity Recognition for Chinese Social Media \
-  with Word Segmentation Representation Learning
-- bert_bilstm_crf_adv: 对抗迁移联合学习,部分参考 paper/adversarial transfer learning for Chinese Named Entity Recognition \
- with Self-Attention Mechanism
+- bert_bilstm_crf_mtl: 共享Bert的多任务联合学习,部分参考 paper/Improving Named Entity Recognition for Chinese Social Media with Word Segmentation Representation Learning
+- bert_bilstm_crf_adv: 对抗迁移联合学习,部分参考 paper/adversarial transfer learning for Chinese Named Entity Recognition with Self-Attention Mechanism
 
 ### Run 
 1. pretrain_model中下载对应预训练模型到对应Folder，具体详见Folder中README.md
@@ -47,5 +46,8 @@ python evaluation.py --model bert_bilstm_crf_mtl_msra_msr --data msra ##注意�
 python evaluation.py --model bert_crf,bert_bilstm_crf,bert_bilstm_crf_mtl_msra_msr --data msra 
 ```
 
-
-
+<p float="left">
+  <img src="https://files.mdnice.com/user/8955/a112ebb1-eb85-45d8-8ada-16ce5906b5d9.png"  width="70%" />
+  &nbsp; &nbsp; &nbsp; &nbsp;
+  <img src="https://files.mdnice.com/user/8955/c13cf469-76d6-47b2-a99a-b19083cfae4b.png"  width="70%" />
+</p>
