@@ -105,7 +105,7 @@ class MultiDataset(object):
                 data: dataset.params
             })
         # use smaller step_per_epoch between 2 dataset
-        self._params['step_per_epoch'] = int(min([p['step_per_epoch'] for p in self._params.values()]))
+        self._params['step_per_epoch'] = int(max([p['step_per_epoch'] for p in self._params.values()]))
         self._params['num_train_steps'] = int(self.epoch_size * self._params['step_per_epoch'])
         self._params['task_list'] = self.data_list
 
