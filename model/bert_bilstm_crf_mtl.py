@@ -8,8 +8,8 @@ from config import TRAIN_PARAMS
 def build_graph(features, labels, params, is_training):
     """
     Multi-task learning. task can be CWS + NER， or different NER dataset
-    all task share bert embedding, and has its own bilstm+crf layer
-    Equal weight for all task
+    asymmetry=False, all task share bert embedding, and has its own bilstm+crf tower
+    asymmetry=True, task2 is the main task, 2 task share bert embedding, task2 use task 1 hidden state also
     """
     input_ids = features['token_ids']
     label_ids = features['label_ids']
@@ -48,6 +48,9 @@ def build_graph(features, labels, params, is_training):
                              params['hidden_units_list'], params['keep_prob_list'],
                              params['cell_size'], params['dtype'], is_training)
 
+        if params['asymmetry']:
+            # if asymmetry, task2 is the main task using task1 information
+            lstm_output2 = tf.concat([lstm_output1, lstm_output2], axis=-1)
         logits = tf.layers.dense(lstm_output2, units=task_params['label_size'], activation=None,
                                  use_bias=True, name='logits')
         add_layer_summary(logits.name, logits)
@@ -75,5 +78,6 @@ RNN_PARAMS = {
 TRAIN_PARAMS.update(RNN_PARAMS)
 TRAIN_PARAMS.update({
     'diff_lr_times': {'crf': 500,  'logit': 500 , 'lstm': 100},
-    'task_weight': [1, 1], # equal weight for CWS+NER/NER+NER task
+    'task_weight': [1, 1], # equal weight for CWS+NER/NER+NER task，
+    'asymmetry': True # If asymmetry, task2 is the main task, using task1 hidden information
 })

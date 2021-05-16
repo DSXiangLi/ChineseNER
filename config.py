@@ -1,7 +1,6 @@
 # -*-coding:utf-8 -*-
-import os
+
 import tensorflow as tf
-os.environ["CUDA_VISIBLE_DEVICES"] = "5"
 
 TRAIN_PARAMS = {
     'dtype': tf.float32,
