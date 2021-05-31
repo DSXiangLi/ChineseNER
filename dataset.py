@@ -5,16 +5,20 @@ import pickle
 import tensorflow as tf
 import numpy as np
 from data.base_preprocess import get_feature_poroto
+from data.word_enhance import SoftWord, SoftLexicon, ExSoftWord, WordEnhanceMethod
 
 
 class NerDataset(object):
-    def __init__(self, data_dir, batch_size, epoch_size):
+    def __init__(self, data_dir, batch_size, epoch_size, word_enhance=None):
+        assert word_enhance in [None] + WordEnhanceMethod, 'word_enhance must in {}'.format(','.join(WordEnhanceMethod))
+        self.word_enhance = word_enhance
+        self.surfix = '' if word_enhance is None else word_enhance #use to distinguish tfrecord with/out word enhance
         self.data_dir = data_dir
         self.batch_size = batch_size
         self.epoch_size = epoch_size
         self._params = None
         self.init_params()
-        self.proto = get_feature_poroto(self.params['max_seq_len'])
+        self.proto = get_feature_poroto(self.params['max_seq_len'], word_enhance)
 
     def parser(self, line):
         features = tf.parse_single_example(line, features=self.proto)
@@ -23,11 +27,24 @@ class NerDataset(object):
         features['segment_ids'] = tf.cast(features['segment_ids'], tf.int32)
         features['label_ids'] = tf.cast(features['label_ids'], tf.int32)
         features['seq_len'] = tf.squeeze(tf.cast(features['seq_len'], tf.int32))
+        # adjust parser when word enhance method is used
+        if self.word_enhance == SoftWord:
+            features['softword_ids'] = tf.cast(features['softword_ids'], tf.int32)
+        elif self.word_enhance == ExSoftWord:
+            # cast to float and reshape to original 2 dimension
+            features['ex_softword_ids'] = tf.reshape(
+                tf.cast(features['ex_softword_ids'], tf.float32), [-1, self.params['word_enhance_dim']])
+        elif self.word_enhance == SoftLexicon:
+            features['softlexicon_ids'] = tf.reshape(
+                tf.cast(features['softlexicon_ids'], tf.int32), [-1, self.params['word_enhance_dim']])
+            features['softlexicon_weights'] = tf.reshape(
+                tf.cast(features['softlexicon_weights'], tf.float32), [-1, self.params['word_enhance_dim']])
         return features
 
     def build_input_fn(self, file_name, is_predict=0, unbatch=False):
         def input_fn():
-            dataset = tf.data.TFRecordDataset(os.path.join(self.data_dir, file_name + '.tfrecord')). \
+            dataset = tf.data.TFRecordDataset(
+                os.path.join(self.data_dir, '_'.join(filter(None, [file_name, self.surfix])) + '.tfrecord')). \
                 map(lambda x: self.parser(x), num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
             if not is_predict:
@@ -46,10 +63,10 @@ class NerDataset(object):
         """
         Inherit max_seq_len, label_size, n_sample from data_preprocess per dataset
         """
-        with open(os.path.join(self.data_dir, 'data_params.pkl'), 'rb') as f:
+        with open(os.path.join(self.data_dir, '_'.join(filter(None, [self.surfix, 'data_params.pkl']))), 'rb') as f:
             self._params = pickle.load(f)
-            self._params['step_per_epoch'] = int(self._params['n_sample']/self.batch_size)
-            self._params['num_train_steps'] = int(self.epoch_size * self._params['step_per_epoch'])
+        self._params['step_per_epoch'] = int(self._params['n_sample']/self.batch_size)
+        self._params['num_train_steps'] = int(self.epoch_size * self._params['step_per_epoch'])
 
     @property
     def params(self):
@@ -115,7 +132,7 @@ class MultiDataset(object):
 
 
 if __name__ == '__main__':
-    prep = NerDataset('./data/msra', 5, 10)
+    prep = NerDataset('./data/msra', 1, 10, word_enhance=SoftLexicon)
     train_input = prep.build_input_fn('train')
 
     sess = tf.Session()
@@ -123,7 +140,8 @@ if __name__ == '__main__':
     sess.run( iterator.initializer )
     sess.run( tf.tables_initializer() )
     sess.run( tf.global_variables_initializer() )
-    print(sess.run( iterator.get_next() ))
+    features = sess.run( iterator.get_next() )
+    print(features)
 
     prep = MultiDataset('./data', ['msra','people_daily'], 4 , 2)
     train_input = prep.build_input_fn('train')

@@ -15,6 +15,10 @@ Requirement: tensorflow 1.14, seqeval 1.2.2, bert-base 0.0.9
 - bert_bilstm_crf
 - bert_cnn_crf
 - bert_bilstm_crf_bigram
+- bert_bilstm_crf_softword
+- bert_bilstm_crf_ex_softword
+- bert_bilstm_crf_softlexicon
+
 2. 多任务
 - bert_bilstm_crf_mtl: 共享Bert的多任务联合学习,部分参考 paper/Improving Named Entity Recognition for Chinese Social Media with Word Segmentation Representation Learning
 - bert_bilstm_crf_adv: 对抗迁移联合学习,部分参考 paper/adversarial transfer learning for Chinese Named Entity Recognition with Self-Attention Mechanism

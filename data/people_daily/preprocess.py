@@ -1,5 +1,6 @@
 # -*-coding:utf-8 -*-
-from data.base_preprocess import DumpTFRecord
+from data.base_preprocess import get_instance, read_text
+from data.word_enhance import WordEnhanceMethod
 
 TAG2IDX = {
     '[PAD]': 0,
@@ -16,43 +17,47 @@ TAG2IDX = {
 
 MAX_SEQ_LEN = 150
 
+MAPPING = {
+    'train': 'train',
+    'dev': 'valid',
+    'test': 'predict'
+}
 
-class PDTFRecord(DumpTFRecord):
-    def __init__(self, data_dir, file_name, bert_model_dir, max_seq_len=MAX_SEQ_LEN, tag2idx=TAG2IDX):
-        super(PDTFRecord, self).__init__(data_dir, file_name, bert_model_dir, max_seq_len, tag2idx)
-        self.mapping = {
-            'train': 'train',
-            'dev': 'valid',
-            'test': 'predict'
-        }
 
-    def load_data(self):
-        """
-        Load line and generate sentence and tag list with char split by ' '
-        sentences: ['今 天 天 气 好 ', ]
-        tags: ['O O O O O ', ]
-        """
-        tokens = self.read_text('example.{}'.format(self.file_name))
-        sentences = []
-        tags = []
-        tag = []
-        sentence = []
-        for i in tokens:
-            if i =='':
-                sentences.append(' '.join(sentence))
-                tags.append(' '.join(tag))
-                tag = []
-                sentence = []
-            else:
-                s, t = i.split(' ')
-                tag.append(t)
-                sentence.append(s)
-        return sentences, tags
+def load_data(data_dir, file_name):
+    """
+    Load line and generate sentence and tag list with char split by ' '
+    sentences: ['今 天 天 气 好 ', ]
+    tags: ['O O O O O ', ]
+    """
+    tokens = read_text(data_dir, 'example.{}'.format(file_name))
+    sentences = []
+    tags = []
+    tag = []
+    sentence = []
+    for i in tokens:
+        if i == '':
+            # Here join by ' ' to avoid bert_tokenizer merging tokens
+            sentences.append(' '.join(sentence))
+            tags.append(' '.join(tag))
+            tag = []
+            sentence = []
+        else:
+            s, t = i.split(' ')
+            tag.append(t)
+            sentence.append(s)
+    return sentences, tags
 
 
 if __name__ == '__main__':
     data_dir = './data/people_daily'
     bert_model = './pretrain_model/ch_wwm_ext'
-    for file in ['train', 'dev', 'test']:
-        prep = PDTFRecord(data_dir, file, bert_model)
-        prep.dump_tfrecord()
+
+    for word_enhance in [None]+WordEnhanceMethod:
+        for file in MAPPING:
+            print('Dumping TF Record for {} word_enhance = {}'.format(file, word_enhance))
+            prep = get_instance(data_dir, file, bert_model, MAX_SEQ_LEN, TAG2IDX, MAPPING,
+                                load_data, word_enhance)
+            prep.dump_tfrecord()
+
+

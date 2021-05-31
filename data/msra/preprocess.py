@@ -1,6 +1,7 @@
 # -*-coding:utf-8 -*-
 import os
-from data.base_preprocess import DumpTFRecord
+from data.base_preprocess import get_instance, read_text
+from data.word_enhance import WordEnhanceMethod
 
 TAG2IDX = {
     '[PAD]': 0,
@@ -17,29 +18,30 @@ TAG2IDX = {
 
 MAX_SEQ_LEN = 150
 
-
-class MsraTFRecord(DumpTFRecord):
-    def __init__(self, data_dir, file_name, bert_model_dir, max_seq_len=MAX_SEQ_LEN, tag2idx=TAG2IDX):
-        super(MsraTFRecord, self).__init__(data_dir, file_name, bert_model_dir, max_seq_len, tag2idx)
-        self.mapping = {
-            'train': 'train',
+MAPPING = {'train': 'train',
             'val': 'valid',
             'test': 'predict'
-        }
+           }
 
-    def load_data(self):
-        """
-        Load sentence and tags
-        """
-        sentences = self.read_text(os.path.join(self.file_name,'sentences.txt'))
-        tags = self.read_text(os.path.join(self.file_name, 'tags.txt'))
-        assert len(sentences) == len(tags)
-        return sentences, tags
+
+def load_data(data_dir, file_name):
+    """
+    Load sentence and tags
+    """
+    sentences = read_text(data_dir, os.path.join(file_name, 'sentences.txt'))
+    tags = read_text(data_dir, os.path.join(file_name, 'tags.txt'))
+    assert len(sentences) == len(tags)
+    return sentences, tags
 
 
 if __name__ == '__main__':
     data_dir = './data/msra'
     bert_model = './pretrain_model/ch_wwm_ext'
-    for file in ['train', 'val', 'test']:
-        prep = MsraTFRecord(data_dir, file, bert_model)
-        prep.dump_tfrecord()
+
+    for word_enhance in [None]+WordEnhanceMethod:
+        for file in MAPPING:
+            print('Dumping TF Record for {} word_enhance ={}'.format(file, word_enhance))
+            prep = get_instance(data_dir, file, bert_model, MAX_SEQ_LEN, TAG2IDX, MAPPING,
+                                load_data, word_enhance)
+            prep.dump_tfrecord()
+

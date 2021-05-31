@@ -4,7 +4,7 @@
 包括 LOC,ORG,PER三类实体
 
 1. 原始数据包括exmaple.dev, example.train, example.test三个file
-2. 运行python ./data/people_daily/preprocess.py 生成tfrecord和data_params数据
+2. 运行python ./data/people_daily/preprocess.py 生成原始tfrecord和data_params数据，以及使用3种word_enhance的tfrecord
 
 **Reference**:   
 <https://github.com/zjy-ucas/ChineseNER>

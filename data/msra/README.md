@@ -5,7 +5,7 @@
 标注形式为BIO，共有46365条语料。包括ORG，LOC, PER三类实体
 
 1. 原始数据包括train,eval,test三个folder
-2. 运行python ./data/msra/preprocess.py 生成tfrecord和data_params数据
+2. 运行python ./data/msra/preprocess.py 生成原始tfrecord和data_params数据，以及使用3种word_enhance的tfrecord
 
 **Reference**:   
 <https://github.com/lemonhu/NER-BERT-pytorch/tree/master/data/msra>

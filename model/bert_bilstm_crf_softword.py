@@ -14,6 +14,7 @@ def build_graph(features, labels, params, is_training):
     input_mask = features['mask']
     segment_ids = features['segment_ids']
     seq_len = features['seq_len']
+    softword_ids = features['softword_ids']
 
     if params['use_bert']:
         # use bert model
@@ -25,11 +26,18 @@ def build_graph(features, labels, params, is_training):
                                          params['embedding_dropout'], is_training)
     load_bert_checkpoint(params['pretrain_dir'])  # load pretrain bert weight from checkpoint
 
-    bigram_embedding = tf.concat([
-        embedding, tf.concat([embedding[:,:1,:], embedding[:,2:,:], embedding[:,-1:,:]], axis=1)
-    ], axis=-1)
+    with tf.variable_scope('word_enhance'):
+        emb_dim = embedding.shape.as_list()[-1]
+        softword_embedding = tf.get_variable(
+            shape=[params['word_enhance_dim'], emb_dim],
+            initializer=tf.truncated_normal_initializer(), name='softword_embedding')
+        wh_embedding = tf.nn.embedding_lookup(softword_embedding, softword_ids) #max_seq_len * emb_dim
+        #embedding = tf.concat([embedding, wh_embedding], axis=-1)
+        embedding += wh_embedding # adding seems to be better than concat
+        add_layer_summary(softword_embedding.name, softword_embedding)
+        add_layer_summary(embedding.name, embedding)
 
-    lstm_output = bilstm(bigram_embedding, params['cell_type'], params['rnn_activation'],
+    lstm_output = bilstm(embedding, params['cell_type'], params['rnn_activation'],
                          params['hidden_units_list'], params['keep_prob_list'],
                          params['cell_size'], params['dtype'], is_training)
 
@@ -54,6 +62,6 @@ RNN_PARAMS = {
 
 TRAIN_PARAMS.update(RNN_PARAMS)
 TRAIN_PARAMS.update({
-    'diff_lr_times': {'crf': 500,  'logit': 500 , 'lstm': 100},
+    'diff_lr_times': {'crf': 500,  'logit': 500, 'lstm': 100, 'word_enhance':100},
     'use_bert': False # for word enhance model we compare with/without bert
 })

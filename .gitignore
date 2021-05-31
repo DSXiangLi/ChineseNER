@@ -3,3 +3,4 @@ data/*/*.tfrecord
 .DS_Store
 .idea/
 pretrain_model/*/*.ckpt*
+pretrain_model/*/*.bz2
