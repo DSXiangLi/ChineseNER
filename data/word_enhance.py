@@ -12,6 +12,7 @@ from itertools import chain
 from collections import defaultdict
 from gensim import models
 from copy import deepcopy
+import importlib
 
 # soft2idx, where idx indicate priority in merging
 Soft2Idx={
@@ -32,7 +33,7 @@ WordEnhanceMethod = [SoftWord, ExSoftWord, SoftLexicon]
 MaxWordLen = 10
 MaxLexiconLen = 10  # only keep topn words for soft lexicon
 NONE_TOKEN= '<None>'
-PretrainModel = './pretrain_model/sgns/sgns.renmin.bigram-char.bz2'
+PretrainModel = 'pretrain_model.ctb50' # algin with the lattice and softlexicon
 
 # Lazy Eval Global Variable
 model = None
@@ -48,8 +49,10 @@ def model_init():
     if model is None:
         print('loading w2v pretrain model {}.It is very very slow, please be patient~~'.format(
             PretrainModel))
-        model = models.KeyedVectors.load_word2vec_format(PretrainModel, binary=True)
+        # ctb50 is glove format, converter is done in __init__
+        model = getattr(importlib.import_module(PretrainModel), 'model')
     if Vocab2IDX is None:
+        print('Building Vocabulary ...')
         Vocab2IDX = dict([(word, idx) for idx, word in enumerate(model.index2word)])
         VocabFreq = dict([(Vocab2IDX[word], model.wv.vocab[word].count) for word in model.index2word])
         N_word = len(VocabFreq)

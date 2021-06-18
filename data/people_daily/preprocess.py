@@ -1,6 +1,7 @@
 # -*-coding:utf-8 -*-
 from data.base_preprocess import get_instance, read_text
 from data.word_enhance import WordEnhanceMethod
+from data.tokenizer import Tokenizers
 
 TAG2IDX = {
     '[PAD]': 0,
@@ -51,13 +52,14 @@ def load_data(data_dir, file_name):
 
 if __name__ == '__main__':
     data_dir = './data/people_daily'
-    bert_model = './pretrain_model/ch_wwm_ext'
 
-    for word_enhance in [None]+WordEnhanceMethod:
-        for file in MAPPING:
-            print('Dumping TF Record for {} word_enhance = {}'.format(file, word_enhance))
-            prep = get_instance(data_dir, file, bert_model, MAX_SEQ_LEN, TAG2IDX, MAPPING,
-                                load_data, word_enhance)
-            prep.dump_tfrecord()
+    for tokenizer in Tokenizers:
+        for word_enhance in [None] + WordEnhanceMethod:
+            for file in MAPPING:
+                print('Dumping TF Record for {} word_enhance = {} tokenizer = {}'.\
+                      format(file, word_enhance, tokenizer))
+                prep = get_instance(data_dir, file, tokenizer, MAX_SEQ_LEN, TAG2IDX, MAPPING,
+                                    load_data, word_enhance)
+                prep.dump_tfrecord()
 
 

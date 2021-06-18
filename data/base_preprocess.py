@@ -1,7 +1,7 @@
 # -*-coding:utf-8 -*-
 import os
 import pickle
-from bert_base.bert import tokenization
+import re
 import tensorflow as tf
 from itertools import chain
 from functools import partial
@@ -10,6 +10,21 @@ from data.word_enhance import (align_with_token, build_softword, build_ex_softwo
                                WordEnhanceMethod, SoftWord, SoftLexicon, ExSoftWord,
                                Soft2Idx, MaxLexiconLen, model_init,
                                postproc_soft_lexicon, prebuild_weight)
+from data.tokenizer import TokenizerGiga, TokenizerBert
+
+
+def extract_prefix_surfix(model_name):
+    """
+    Infer word_enhance and tokenizer type from model name
+    1. model_name start with bert use bert tokenizer
+    2. model_name end with word enhance use word enhance
+    """
+    word_enhance = re.search('({})|({})|({})'.format(SoftWord, SoftLexicon, ExSoftWord), model_name)
+    word_enhance = word_enhance.group() if word_enhance else None
+
+    tokenizer_type = re.search('({})'.format(TokenizerBert), model_name)
+    tokenizer_type = tokenizer_type.group() if tokenizer_type else TokenizerGiga
+    return word_enhance, tokenizer_type
 
 
 class TrainFeature:
@@ -56,7 +71,7 @@ def get_feature_poroto(max_seq_len, word_enhance=None):
     return feature_proto
 
 
-def get_instance(data_dir, file_name, bert_model_dir,
+def get_instance(data_dir, file_name, tokenizer_type,
                  max_seq_len, tag2idx, mapping, load_data_func, word_enhance=None, **kwargs):
     # Init instance with different cls, and dynamic add data specific load_data func to instance
     assert word_enhance in [None]+WordEnhanceMethod, 'word_enhance must in {}'.format(','.join(WordEnhanceMethod))
@@ -72,7 +87,7 @@ def get_instance(data_dir, file_name, bert_model_dir,
         else:
             cls = SoftLexiconTFRecord
 
-    instance = cls(data_dir, file_name, bert_model_dir, max_seq_len, tag2idx, mapping, load_data_func, **kwargs)
+    instance = cls(data_dir, file_name, tokenizer_type, max_seq_len, tag2idx, mapping, load_data_func, **kwargs)
     return instance
 
 
@@ -85,14 +100,16 @@ def read_text(data_dir, filename):
 
 
 class BasicTFRecord(object):
-    def __init__(self, data_dir, file_name, bert_model_dir, max_seq_len, tag2idx, mapping, load_data_func):
+    def __init__(self, data_dir, file_name, tokenizer_type, max_seq_len, tag2idx, mapping, load_data_func):
         self.data_dir = data_dir
         self.file_name = file_name
         self.max_seq_len = max_seq_len
         self.tag2idx = tag2idx
-        self.tokenizer = tokenization.FullTokenizer(os.path.join(bert_model_dir, "vocab.txt"), do_lower_case=True)
+        # get certain tokenizer
+        self.tokenizer = getattr(importlib.import_module('data.tokenizer'), 'get_{}_tokenizer'.format(tokenizer_type))()
         self.mapping = mapping
-        self.surfix = ''# used to distinguish tf record and data params
+        self.word_enhance = None # used to distinguish basic tfrecord from other word_enhance tfrecord
+        self.tokenizer_type = tokenizer_type # used to distinguish tfrecord for bert model from other None bert model
         self.load_data = load_data_func # pass in load_data_func given differnt dataset
         self.sentence_list, self.tag_list = self.load_data(self.data_dir, self.file_name)
 
@@ -178,12 +195,18 @@ class BasicTFRecord(object):
             'tag2idx': self.tag2idx,
             'idx2tag': dict([(val, key)for key, val in self.tag2idx.items()])
         }
+        if self.tokenizer_type == TokenizerGiga:
+            params.update({
+                'embedding': self.tokenizer.embedding # add pretrain token embedding
+            })
         return params
 
     def dump_tfrecord(self):
         n_sample = 0
         n_invalid_sample = 0
-        with tf.io.TFRecordWriter(os.path.join(self.data_dir, '_'.join(filter(None, [self.rename_file, self.surfix])) + '.tfrecord')) as writer:
+        with tf.io.TFRecordWriter(os.path.join(self.data_dir, '_'.join(filter(None, [self.tokenizer_type,
+                                                                                     self.rename_file,
+                                                                                     self.word_enhance])) + '.tfrecord')) as writer:
             for sentence, tag in zip(self.sentence_list, self.tag_list):
                 try:
                     feature = self.build_feature(sentence, tag)
@@ -199,7 +222,9 @@ class BasicTFRecord(object):
         print('Dump {} sample, invalid_sample = {}'.format(n_sample, n_invalid_sample))
         if 'train' in self.file_name:
             params = self.build_data_params(n_sample)
-            with open(os.path.join(self.data_dir, '_'.join(filter(None, [self.surfix, 'data_params.pkl']))), 'wb') as f:
+            with open(os.path.join(self.data_dir, '_'.join(filter(None, [self.tokenizer_type,
+                                                                         self.word_enhance,
+                                                                         'data_params.pkl']))), 'wb') as f:
                 pickle.dump(params, f)
 
 ####################################
@@ -208,9 +233,9 @@ class BasicTFRecord(object):
 
 
 class SoftwordTFRecord(BasicTFRecord):
-    def __init__(self, data_dir, file_name, bert_model_dir, max_seq_len, tag2idx, mapping, load_data_func):
-        super(SoftwordTFRecord, self).__init__(data_dir, file_name, bert_model_dir, max_seq_len, tag2idx, mapping, load_data_func)
-        self.surfix = SoftWord # surfix = word enhance method
+    def __init__(self, data_dir, file_name,  tokenizer_type, max_seq_len, tag2idx, mapping, load_data_func):
+        super(SoftwordTFRecord, self).__init__(data_dir, file_name,  tokenizer_type, max_seq_len, tag2idx, mapping, load_data_func)
+        self.word_enhance = SoftWord
         self.soft2idx = Soft2Idx
 
     def format_soft_seq(self, seq):
@@ -229,7 +254,9 @@ class SoftwordTFRecord(BasicTFRecord):
         """
         train_feature = super().build_feature(sentence, tag)
         softword_ids = build_softword(sentence, False)
-        softword_ids = align_with_token(softword_ids, train_feature.tokens, word_enhance=self.surfix)
+        if self.tokenizer_type == TokenizerBert:
+            # for character tokenizer, no need to align with tokenizer
+            softword_ids = align_with_token(softword_ids, train_feature.tokens, word_enhance=self.word_enhance)
         train_feature.softword_ids = self.format_soft_seq(softword_ids)
         return train_feature
 
@@ -246,9 +273,9 @@ class SoftwordTFRecord(BasicTFRecord):
 
 
 class ExSoftwordTFRecord(BasicTFRecord):
-    def __init__(self, data_dir, file_name, bert_model_dir, max_seq_len, tag2idx, mapping, load_data_func):
-        super(ExSoftwordTFRecord, self).__init__(data_dir, file_name, bert_model_dir, max_seq_len, tag2idx, mapping, load_data_func)
-        self.surfix = ExSoftWord
+    def __init__(self, data_dir, file_name,  tokenizer_type, max_seq_len, tag2idx, mapping, load_data_func):
+        super(ExSoftwordTFRecord, self).__init__(data_dir, file_name, tokenizer_type, max_seq_len, tag2idx, mapping, load_data_func)
+        self.word_enhance = ExSoftWord
         self.soft2idx = Soft2Idx
 
     def format_soft_seq(self, seq):
@@ -269,7 +296,9 @@ class ExSoftwordTFRecord(BasicTFRecord):
         """
         train_feature = super().build_feature(sentence, tag)
         ex_softword_ids = build_ex_softword(sentence, False)
-        ex_softword_ids = align_with_token(ex_softword_ids, train_feature.tokens, word_enhance=self.surfix)
+        if self.tokenizer_type == TokenizerBert:
+            # for character tokenizer, no need to align with tokenizer
+            ex_softword_ids = align_with_token(ex_softword_ids, train_feature.tokens, word_enhance=self.word_enhance)
         train_feature.ex_softword_ids = self.format_soft_seq(ex_softword_ids)
         return train_feature
 
@@ -287,9 +316,9 @@ class ExSoftwordTFRecord(BasicTFRecord):
 
 
 class SoftLexiconTFRecord(BasicTFRecord):
-    def __init__(self, data_dir, file_name, bert_model_dir, max_seq_len, tag2idx, mapping, load_data_func, default_weight=True):
-        super(SoftLexiconTFRecord, self).__init__(data_dir, file_name, bert_model_dir, max_seq_len, tag2idx, mapping, load_data_func)
-        self.surfix = SoftLexicon # surfix = word enhance method
+    def __init__(self, data_dir, file_name, tokenizer_type, max_seq_len, tag2idx, mapping, load_data_func, default_weight=True):
+        super(SoftLexiconTFRecord, self).__init__(data_dir, file_name, tokenizer_type, max_seq_len, tag2idx, mapping, load_data_func)
+        self.word_enhance = SoftLexicon # surfix = word enhance method
         self.soft2idx=Soft2Idx
         model_init() # Only used when cls is init outside get_instance
         self.default_weight = default_weight # True will use pretrain model vocabFreq, otherwise calculate by input data
@@ -337,7 +366,9 @@ class SoftLexiconTFRecord(BasicTFRecord):
         """
         train_feature = super().build_feature(sentence, tag)
         soft_lexicon = build_soft_lexicon(sentence, False)
-        soft_lexicon = align_with_token(soft_lexicon, train_feature.tokens, word_enhance=self.surfix)
+        if self.tokenizer_type == TokenizerBert:
+            # for character tokenizer, no need to align with tokenizer
+            soft_lexicon = align_with_token(soft_lexicon, train_feature.tokens, word_enhance=self.word_enhance)
         ids, weights = self.postproc_func(soft_lexicon)
         train_feature.softlexicon_ids = self.format_soft_seq(ids)
         train_feature.softlexicon_weights = self.format_soft_seq(weights, type='weight')
@@ -359,5 +390,4 @@ class SoftLexiconTFRecord(BasicTFRecord):
         params['max_lexicon_len'] = MaxLexiconLen
         params['word_embedding'] = getattr(importlib.import_module('data.word_enhance'), 'VocabEmbedding')
         return params
-
 

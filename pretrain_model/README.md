@@ -14,3 +14,12 @@
 3. sgns: People's Daily News 人民日报 300d word+Ngram 预训练词向量
 - 项目链接：https://github.com/Embedding/Chinese-Word-Vectors
 - 模型链接：https://pan.baidu.com/s/1upPkA8KJnxTZBfjuNDtaeQ
+
+4. Giga: Character embeddings (gigaword_chn.all.a2b.uni.ite50.vec) 
+是Glove word2vec格式想用gensim word2vec加载需要运行glova_2_wv中的covert
+- 模型链接：https://drive.google.com/file/d/1_Zlf0OAZKVdydk7loUpkzD2KPEotUE8u/view?usp=sharing
+- 项目链接：https://github.com/jiesutd/LatticeLSTM 复用LatticeLSTM
+
+5. ctb50: Word(Lattice) embeddings (ctb.50d.vec)
+- 模型链接：https://drive.google.com/file/d/1K_lG3FlXTgOOf8aQ4brR9g3R40qi1Chv/view
+- 项目链接：https://github.com/jiesutd/LatticeLSTM 复用LatticeLSTM

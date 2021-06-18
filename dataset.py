@@ -4,21 +4,19 @@ import os
 import pickle
 import tensorflow as tf
 import numpy as np
-from data.base_preprocess import get_feature_poroto
-from data.word_enhance import SoftWord, SoftLexicon, ExSoftWord, WordEnhanceMethod
+from data.base_preprocess import get_feature_poroto, extract_prefix_surfix
+from data.word_enhance import SoftWord, SoftLexicon, ExSoftWord
 
 
 class NerDataset(object):
-    def __init__(self, data_dir, batch_size, epoch_size, word_enhance=None):
-        assert word_enhance in [None] + WordEnhanceMethod, 'word_enhance must in {}'.format(','.join(WordEnhanceMethod))
-        self.word_enhance = word_enhance
-        self.surfix = '' if word_enhance is None else word_enhance #use to distinguish tfrecord with/out word enhance
+    def __init__(self, data_dir, batch_size, epoch_size, model_name):
+        self.surfix, self.prefix = extract_prefix_surfix(model_name)
         self.data_dir = data_dir
         self.batch_size = batch_size
         self.epoch_size = epoch_size
         self._params = None
         self.init_params()
-        self.proto = get_feature_poroto(self.params['max_seq_len'], word_enhance)
+        self.proto = get_feature_poroto(self.params['max_seq_len'], self.surfix)
 
     def parser(self, line):
         features = tf.parse_single_example(line, features=self.proto)
@@ -28,13 +26,13 @@ class NerDataset(object):
         features['label_ids'] = tf.cast(features['label_ids'], tf.int32)
         features['seq_len'] = tf.squeeze(tf.cast(features['seq_len'], tf.int32))
         # adjust parser when word enhance method is used
-        if self.word_enhance == SoftWord:
+        if self.surfix == SoftWord:
             features['softword_ids'] = tf.cast(features['softword_ids'], tf.int32)
-        elif self.word_enhance == ExSoftWord:
+        elif self.surfix == ExSoftWord:
             # cast to float and reshape to original 2 dimension
             features['ex_softword_ids'] = tf.reshape(
                 tf.cast(features['ex_softword_ids'], tf.float32), [-1, self.params['word_enhance_dim']])
-        elif self.word_enhance == SoftLexicon:
+        elif self.surfix == SoftLexicon:
             features['softlexicon_ids'] = tf.reshape(
                 tf.cast(features['softlexicon_ids'], tf.int32), [-1, self.params['word_enhance_dim']])
             features['softlexicon_weights'] = tf.reshape(
@@ -44,7 +42,7 @@ class NerDataset(object):
     def build_input_fn(self, file_name, is_predict=0, unbatch=False):
         def input_fn():
             dataset = tf.data.TFRecordDataset(
-                os.path.join(self.data_dir, '_'.join(filter(None, [file_name, self.surfix])) + '.tfrecord')). \
+                os.path.join(self.data_dir, '_'.join(filter(None, [self.prefix, file_name, self.surfix])) + '.tfrecord')). \
                 map(lambda x: self.parser(x), num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
             if not is_predict:
@@ -63,7 +61,7 @@ class NerDataset(object):
         """
         Inherit max_seq_len, label_size, n_sample from data_preprocess per dataset
         """
-        with open(os.path.join(self.data_dir, '_'.join(filter(None, [self.surfix, 'data_params.pkl']))), 'rb') as f:
+        with open(os.path.join(self.data_dir, '_'.join(filter(None, [self.prefix, self.surfix, 'data_params.pkl']))), 'rb') as f:
             self._params = pickle.load(f)
         self._params['step_per_epoch'] = int(self._params['n_sample']/self.batch_size)
         self._params['num_train_steps'] = int(self.epoch_size * self._params['step_per_epoch'])
@@ -78,12 +76,12 @@ class MultiDataset(object):
     Used for Multi-Task & Adversarial task. Each batch will include samples from all tasks with same size
     For now only 2 task are supported
     """
-    def __init__(self, root_dir, data_list, batch_size, epoch_size):
+    def __init__(self, root_dir, data_list, batch_size, epoch_size, model_name):
         self._params = {}
         self.batch_size = batch_size
         self.epoch_size = epoch_size
         self.data_list = data_list
-        self.dataset_dict = dict([(dir, NerDataset(os.path.join(root_dir, dir), batch_size, epoch_size)) \
+        self.dataset_dict = dict([(dir, NerDataset(os.path.join(root_dir, dir), batch_size, epoch_size, model_name)) \
                                   for dir in data_list])
         self.init_params()
 
@@ -132,7 +130,7 @@ class MultiDataset(object):
 
 
 if __name__ == '__main__':
-    prep = NerDataset('./data/msra', 1, 10, word_enhance=SoftLexicon)
+    prep = NerDataset('./data/msra', 1, 10, model_name='bert_bilstm_crf')
     train_input = prep.build_input_fn('train')
 
     sess = tf.Session()

@@ -1,4 +1,5 @@
 # -*-coding:utf-8 -*-
+import os
 import pickle
 import argparse
 import numpy as np
@@ -9,9 +10,12 @@ from sklearn.metrics import classification_report as tag_cls_report
 from collections import defaultdict
 from tools.predict_utils import process_prediction
 
+from data.base_preprocess import extract_prefix_surfix
+
 
 class SingleEval(object):
     def __init__(self, model_name, data, verbose=True):
+        self.surfix, self.prefix = extract_prefix_surfix(model_name)
         self.model_name = model_name
         self.data = data
         self.prediction = None
@@ -25,7 +29,8 @@ class SingleEval(object):
     def init(self):
         with open('./data/{}/{}_predict.pkl'.format(self.data, self.model_name), 'rb') as f:
             prediction = pickle.load(f)
-        with open('./data/{}/data_params.pkl'.format(self.data), 'rb') as f:
+        with open('./data/{}/{}'.format(self.data,
+                                        '_'.join(filter(None, [self.prefix, self.surfix, 'data_params.pkl']))), 'rb') as f:
             data_params = pickle.load(f)
         self.idx2tag = data_params['idx2tag']
         self.prediction = [process_prediction(i, self.idx2tag) for i in prediction]
