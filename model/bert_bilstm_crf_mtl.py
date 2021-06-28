@@ -30,7 +30,7 @@ def build_graph(features, labels, params, is_training):
         task_params = params[params['task_list'][0]]
         lstm_output1 = bilstm(embedding, params['cell_type'], params['rnn_activation'],
                              params['hidden_units_list'], params['keep_prob_list'],
-                             params['cell_size'], params['dtype'], is_training)
+                             params['cell_size'], seq_len, params['dtype'], is_training)
 
         logits = tf.layers.dense(lstm_output1, units=task_params['label_size'], activation=None,
                                  use_bias=True, name='logits')
@@ -46,7 +46,7 @@ def build_graph(features, labels, params, is_training):
         task_params = params[params['task_list'][1]]
         lstm_output2 = bilstm(embedding, params['cell_type'], params['rnn_activation'],
                              params['hidden_units_list'], params['keep_prob_list'],
-                             params['cell_size'], params['dtype'], is_training)
+                             params['cell_size'], seq_len, params['dtype'], is_training)
 
         if params['asymmetry']:
             # if asymmetry, task2 is the main task using task1 information

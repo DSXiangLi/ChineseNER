@@ -30,7 +30,7 @@ def build_graph(features, labels, params, is_training):
     with tf.variable_scope('task_discriminator', reuse=tf.AUTO_REUSE):
         share_output = bilstm(embedding, params['cell_type'], params['rnn_activation'],
                              params['hidden_units_list'], params['keep_prob_list'],
-                             params['cell_size'], params['dtype'], is_training) # batch * max_seq * (2*hidden)
+                             params['cell_size'], seq_len, params['dtype'], is_training) # batch * max_seq * (2*hidden)
         share_max_pool = tf.reduce_max(share_output, axis=1, name='share_max_pool') # batch * (2* hidden) extract most significant feature
         # reverse gradient of max_output to only update the unit use to distinguish task
         share_max_pool = flip_gradient(share_max_pool, params['shrink_gradient_reverse'])
@@ -50,7 +50,7 @@ def build_graph(features, labels, params, is_training):
         task_params = params[params['task_list'][0]]
         lstm_output = bilstm(embedding, params['cell_type'], params['rnn_activation'],
                              params['hidden_units_list'], params['keep_prob_list'],
-                             params['cell_size'], params['dtype'], is_training)
+                             params['cell_size'], seq_len, params['dtype'], is_training)
         lstm_output = tf.concat([share_output, lstm_output], axis=-1) # bath * (4* hidden)
 
         logits = tf.layers.dense(lstm_output, units=task_params['label_size'], activation=None,

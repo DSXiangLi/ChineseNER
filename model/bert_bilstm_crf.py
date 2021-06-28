@@ -21,7 +21,7 @@ def build_graph(features, labels, params, is_training):
 
     lstm_output = bilstm(embedding, params['cell_type'], params['rnn_activation'],
                          params['hidden_units_list'], params['keep_prob_list'],
-                         params['cell_size'], params['dtype'], is_training)
+                         params['cell_size'], seq_len, params['dtype'], is_training)
 
     logits = tf.layers.dense(lstm_output, units=params['label_size'], activation=None,
                              use_bias=True, name='logits')
