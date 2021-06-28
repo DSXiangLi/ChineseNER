@@ -1,7 +1,15 @@
 # -*-coding:utf-8 -*-
 import os
+import numpy as np
 import shutil
 import tensorflow as tf
+
+
+def normalize(vector: np.ndarray):
+    norm = np.linalg.norm(vector)
+    if norm == 0:
+        norm = np.finfo(vector.dtype).eps
+    return vector / norm
 
 
 def clear_model(model_dir):

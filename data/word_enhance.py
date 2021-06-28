@@ -10,9 +10,9 @@ import pickle
 import numpy as np
 from itertools import chain
 from collections import defaultdict
-from gensim import models
 from copy import deepcopy
 import importlib
+from tools.utils import normalize
 
 # soft2idx, where idx indicate priority in merging
 Soft2Idx={
@@ -33,6 +33,7 @@ WordEnhanceMethod = [SoftWord, ExSoftWord, SoftLexicon]
 MaxWordLen = 10
 MaxLexiconLen = 10  # only keep topn words for soft lexicon
 NONE_TOKEN= '<None>'
+PAD_TOKEN= '<PAD>'
 PretrainModel = 'pretrain_model.ctb50' # algin with the lattice and softlexicon
 
 # Lazy Eval Global Variable
@@ -49,7 +50,7 @@ def model_init():
     if model is None:
         print('loading w2v pretrain model {}.It is very very slow, please be patient~~'.format(
             PretrainModel))
-        # ctb50 is glove format, converter is done in __init__
+        # ctb50/giga are both in glove format, converter is done in __init__
         model = getattr(importlib.import_module(PretrainModel), 'model')
     if Vocab2IDX is None:
         print('Building Vocabulary ...')
@@ -57,13 +58,19 @@ def model_init():
         VocabFreq = dict([(Vocab2IDX[word], model.wv.vocab[word].count) for word in model.index2word])
         N_word = len(VocabFreq)
         Vocab2IDX.update({
-            NONE_TOKEN: N_word+1
+            NONE_TOKEN: N_word,
+            PAD_TOKEN: N_word+1
         })
         VocabFreq.update({
-            Vocab2IDX[NONE_TOKEN]: 1
+            Vocab2IDX[NONE_TOKEN]: 1,
+            Vocab2IDX[PAD_TOKEN]: 0
         })
     if VocabEmbedding is None:
-        VocabEmbedding = np.array(model.vectors)
+        VocabEmbedding = np.vstack((np.array(model.vectors),
+                                    np.random.normal(0, 1, size=(model.vector_size)), # None Token
+                                    np.zeros(model.vector_size) # Pad Token
+                                    )).astype(np.float32)
+        VocabEmbedding = np.apply_along_axis(normalize, 1, VocabEmbedding)
 
 
 def align_with_token(idx_list, tokens, word_enhance):
@@ -149,13 +156,13 @@ def postproc_soft_lexicon(output_list, vocabfreq):
     def helper(ids):
         n = len(ids)
         if n <= MaxLexiconLen:
-            # pad with None
-            ids = list(ids) + [Vocab2IDX[NONE_TOKEN]] * (MaxLexiconLen -n)
+            # pad with PAD
+            ids = list(ids) + [Vocab2IDX[PAD_TOKEN]] * (MaxLexiconLen -n)
             weight = [vocabfreq.get(i, 1) for i in ids ]
             return ids, weight
         else:
             # truncate to max
-            tmp = sorted([(i, vocabfreq.get(i, 1)) for i in ids], key=lambda x: x[1]) # sort by frequency
+            tmp = sorted([(i, vocabfreq.get(i, 1)) for i in ids], key=lambda x: x[1], reverse=True) # sort by frequency
             tmp = tmp[:MaxLexiconLen]
             tmp = list(zip(*tmp))
             return tmp[0], tmp[1]
@@ -230,7 +237,7 @@ def build_ex_softword(sentence, verbose=False):
 
     # one-hot encoding of B/M/E/S/None/set
     onehot_index = []
-    default = [0,0,0,0,0]
+    default = [0, 0, 0, 0, 1]
     for index in ex_softword_index:
         if len(index)==0:
             onehot_index.append(default)
@@ -248,14 +255,12 @@ def build_soft_lexicon(sentence, verbose=False):
     Output: [{'B':[], 'M':[], 'E':[],'S':[]},{'B':[], 'M':[], 'E':[],'S':[]}...]
     """
     sentence = sentence.replace(' ', '')
-    default = {'B' : set(), 'M' : set(), 'E' : set(),'S' :set(),'None' : set()}
+    default = {'B' : set(), 'M' : set(), 'E' : set(), 'S' :set()}
     soft_lexicon = [deepcopy(default) for i in range(len(sentence))]
     for i in range(len(sentence)):
-        n_match=0
         for j in range(i, min(i+MaxWordLen, len(sentence))):
             word = sentence[i:(j + 1)]
             if word in Vocab2IDX:
-                n_match+=1
                 if j-i==0:
                     soft_lexicon[i]['S'].add(word)
                 elif j-i==1:
@@ -266,9 +271,11 @@ def build_soft_lexicon(sentence, verbose=False):
                     soft_lexicon[j]['E'].add(word)
                     for k in range(i+1, j):
                         soft_lexicon[j]['M'].add(word)
-        if n_match==0:
-            # if nothing match add None token in None Field
-            soft_lexicon[i]['None'].add(NONE_TOKEN)
+        for key, val in soft_lexicon[i].items():
+            if not val:
+                # eg.no matching E soft lexicon, fill in with None Token
+                soft_lexicon[i][key].add(NONE_TOKEN)
+
     if verbose:
         print(sentence)
         print(soft_lexicon)
@@ -316,6 +323,7 @@ if __name__ == '__main__':
         r2 = build_ex_softword(s2, True)
 
         # Test SoftLexicon
+        s1 = '为 了 跟 踪 '
         r1 = build_soft_lexicon(s1, True)
         r2 = build_soft_lexicon(s2, True)
 

@@ -4,6 +4,8 @@ import importlib
 import os
 import numpy as np
 
+from tools.utils import normalize
+
 TokenizerBert = 'bert'
 TokenizerGiga = 'giga'
 Tokenizers = [TokenizerGiga, TokenizerBert]
@@ -39,27 +41,43 @@ class GigaTokenizer(object):
         self.vocab2idx = self.get_vocab2idx()
 
     def get_vocab2idx(self):
+        """
+        Don't use CLS and SEP. Their random init embedding will impact lstm performance
+        """
         vocab2idx = dict([(word, idx) for idx, word in enumerate(self.model.index2word)])
         n_vocab = len(vocab2idx)
         vocab2idx.update({
-            '[CLS]': n_vocab,
-            '[SEP]': n_vocab+1,
-            '[PAD]': n_vocab+2,
-            '[UNK]': n_vocab+3,
+            '[PAD]': n_vocab,
+            '[UNK]': n_vocab+1,
         })
         return vocab2idx
 
     @property
     def embedding(self):
         embedding = np.array(self.model.vectors)
-        addon_embedding = np.random.normal(0, 1, size=(4, self.model.vector_size))
+        addon_embedding = np.random.normal(0, 1, size=(2, self.model.vector_size))
         embedding = np.vstack((embedding, addon_embedding)).astype(np.float32)
+        embedding = np.apply_along_axis(normalize, 1 , embedding) # normalize embedding to 1
         return embedding
+
+    @staticmethod
+    def full2half(text):
+        """
+        全角半角转换, giga vocab里面缺少全角字符例如'，'对效果有较大影响，Bert tokenizer没有这个问题
+        """
+        num = ord(text)
+        if num == 0x3000:
+            num = 0x20
+        elif 0xFF01 <= num <= 0xFF5E:
+            num = num - 0xFEE0
+        s = chr(num)
+        return s
 
     def tokenize(self, text):
         tokens = []
         for i in text:
             if i.strip():
+                i = self.full2half(i)
                 if i in self.vocab2idx:
                     tokens.append(i)
                 else:
@@ -75,7 +93,7 @@ if __name__ == '__main__':
     s = '今天天气真好😔'
     tokens = tokenizer.tokenize(s)
     print(tokens )
-    tokens += ['[CLS]'] + ['[SEP]'] + ['[PAD]']
+    tokens +=  ['[PAD]']
     tokenids = tokenizer.convert_tokens_to_ids(tokens)
     print(tokenids)
 
