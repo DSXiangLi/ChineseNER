@@ -40,10 +40,10 @@ if __name__ == '__main__':
 
     for tokenizer in Tokenizers:
          for word_enhance in [None]+WordEnhanceMethod:
-            file='train'
-            print('Dumping TF Record for {} word_enhance = {} tokenizer = {}'.\
-                  format(file, word_enhance, tokenizer))
-            prep = get_instance(data_dir, file, tokenizer, MAX_SEQ_LEN, TAG2IDX, MAPPING,
-                                load_data, word_enhance)
-            prep.dump_tfrecord()
+            for file in MAPPING:
+                print('Dumping TF Record for {} word_enhance = {} tokenizer = {}'.\
+                      format(file, word_enhance, tokenizer))
+                prep = get_instance(data_dir, file, tokenizer, MAX_SEQ_LEN, TAG2IDX, MAPPING,
+                                    load_data, word_enhance)
+                prep.dump_tfrecord()
 
