@@ -110,8 +110,13 @@ def build_model_fn(model_name):
             tf.summary.text('tokens', token2sequence(features['tokens'][0, :]))
             tf.summary.text('labels', token2sequence(features['labels'][0, :]))
 
-            train_op = create_train_op(loss, params['lr'], params['num_train_steps'],
-                                       params['warmup_ratio'], params['diff_lr_times'])
+            if 'bert' in model_name:
+                train_op = bert_train_op(loss, params['lr'], params['num_train_steps'],
+                                           params['warmup_ratio'], params['diff_lr_times'], True)
+            else:
+                train_op = custom_train_op(loss, params['lr'], params['step_per_epoch'],
+                                            params['decay_rate'])
+
             spec = tf.estimator.EstimatorSpec(mode, loss=loss,
                                               train_op=train_op,
                                               training_hooks=[get_log_hook(loss, params['log_steps'])])
@@ -148,8 +153,12 @@ def build_mtl_model_fn(model_name):
             tf.summary.text('tokens_{}'.format(params['task_list'][1]), token2sequence(tokens))
             tf.summary.text('labels_{}'.format(params['task_list'][1]), token2sequence(labels))
 
-            train_op = create_train_op(loss, params['lr'], params['num_train_steps'],
-                                       params['warmup_ratio'], params['diff_lr_times'], True)
+            if 'bert' in model_name:
+                train_op = bert_train_op(loss, params['lr'], params['num_train_steps'],
+                                           params['warmup_ratio'], params['diff_lr_times'], True)
+            else:
+                train_op = custom_train_op(loss, params['lr'], params['num_train_steps'],
+                                           params['decay_rate'])
             spec = tf.estimator.EstimatorSpec(mode, loss=loss,
                                               train_op=train_op,
                                               training_hooks=[get_log_hook(loss, params['log_steps'])])
@@ -212,7 +221,7 @@ def create_optimizer(init_lr, num_train_steps, num_warmup_steps, global_step):
     return optimizer, learning_rate
 
 
-def create_train_op(loss, init_lr, num_train_steps, warmup_ratio, diff_lr_times, verbose=False):
+def bert_train_op(loss, init_lr, num_train_steps, warmup_ratio, diff_lr_times, verbose=False):
     """
     Allow using different learning rate schema for different layer. If not this is the same as bert pretrain opt/lr
     """
@@ -262,4 +271,45 @@ def create_train_op(loss, init_lr, num_train_steps, warmup_ratio, diff_lr_times,
         (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
         train_op = opt.apply_gradients(zip(grads, tvars), global_step=global_step)
         train_op = tf.group(train_op, [global_step.assign(global_step + 1)])
+    return train_op
+
+
+def custom_train_op(loss, init_lr, step_per_epoch, decay_rate):
+    """
+    Adam Train op with Exponential lr decay
+    """
+    lr = lr_decay(init_lr, step_per_epoch, decay_rate)
+
+    opt = tf.train.AdamOptimizer(lr)
+
+    train_op = gradient_clipping(opt, loss)
+
+    return train_op
+
+
+def lr_decay(init_lr, step_per_epoch, decay_rate):
+    global_step = tf.train.get_or_create_global_step()
+
+    lr = tf.train.exponential_decay(
+        init_lr,
+        global_step,
+        step_per_epoch,
+        staircase=True,
+        decay_rate=decay_rate)
+
+    tf.summary.scalar('lr', lr)
+    return lr
+
+
+def gradient_clipping(optimizer, cost):
+    """
+    apply gradient clipping
+    """
+    gradients, variables = zip(*optimizer.compute_gradients( cost ))
+
+    clip_grad = [tf.clip_by_value( grad, -5, 5) for grad in gradients if grad is not None]
+
+    train_op = optimizer.apply_gradients(zip(clip_grad, variables),
+                                         global_step=tf.train.get_global_step() )
+
     return train_op
