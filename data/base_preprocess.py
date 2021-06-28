@@ -59,13 +59,15 @@ def get_feature_poroto(max_seq_len, word_enhance=None):
             'softword_ids': tf.io.FixedLenFeature([max_seq_len], dtype=tf.int64)
         })
     elif word_enhance == ExSoftWord:
+        #len(Soft2Idx)=5, including B/M/E/S/None
         feature_proto.update({
             'ex_softword_ids': tf.io.FixedLenFeature([max_seq_len*len(Soft2Idx)], dtype=tf.int64)
         })
     else:
+        #rm None from Soft2Idx
         feature_proto.update({
-            'softlexicon_ids': tf.io.FixedLenFeature([max_seq_len*len(Soft2Idx)*MaxLexiconLen], dtype=tf.int64),
-            'softlexicon_weights': tf.io.FixedLenFeature([max_seq_len*len(Soft2Idx)*MaxLexiconLen], dtype=tf.float32)
+            'softlexicon_ids': tf.io.FixedLenFeature([max_seq_len*(len(Soft2Idx)-1)*MaxLexiconLen], dtype=tf.int64),
+            'softlexicon_weights': tf.io.FixedLenFeature([max_seq_len*(len(Soft2Idx)-1)*MaxLexiconLen], dtype=tf.float32)
         })
 
     return feature_proto
