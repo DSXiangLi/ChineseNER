@@ -390,7 +390,7 @@ class SoftLexiconTFRecord(BasicTFRecord):
         params = super().build_data_params(n_sample)
         params['soft2idx'] = self.soft2idx
         params['vocab2idx'] = self.vocab2idx
-        params['word_enhance_dim'] = len(self.soft2idx) # B/M/E/S/None * max_lexicon_len
+        params['word_enhance_dim'] = len(self.soft2idx)-1 # 4=B/M/E/S
         params['max_lexicon_len'] = MaxLexiconLen
         params['word_embedding'] = getattr(importlib.import_module('data.word_enhance'), 'VocabEmbedding')
         return params
