@@ -36,15 +36,16 @@ def build_graph(features, labels, params, is_training):
         wh_embedding = tf.reduce_mean(wh_embedding, axis=-2)
         wh_embedding = tf.reshape(wh_embedding, [-1, params['max_seq_len'],
                                                  int(params['word_enhance_dim'] * word_embedding_dim)])
-        #Method2: weighted average all lexicons in B+M+E+S -> emb_dim [Doesn't work at all]
-        #wh_embedding = tf.reduce_mean(wh_embedding, axis=2)
+
+        wh_embedding = tf.layers.dropout(wh_embedding, rate=params['embedding_dropout'],
+                                         seed=1234, training=is_training)
         embedding = tf.concat([wh_embedding, embedding], axis=-1)
         add_layer_summary('wh_embedding', wh_embedding)
         add_layer_summary(embedding.name, embedding)
 
     lstm_output = bilstm(embedding, params['cell_type'], params['rnn_activation'],
                          params['hidden_units_list'], params['keep_prob_list'],
-                         params['cell_size'], params['dtype'], is_training)
+                         params['cell_size'], seq_len, params['dtype'], is_training)
 
     logits = tf.layers.dense(lstm_output, units=params['label_size'], activation=None,
                              use_bias=True, name='logits')
@@ -61,12 +62,15 @@ RNN_PARAMS = {
     'cell_type': 'lstm',
     'cell_size': 1,
     'hidden_units_list': [128],
-    'keep_prob_list': [0.8],
-    'rnn_activation': 'relu',
-    'batch_size': 20
+    'keep_prob_list': [1],
+    'rnn_activation': 'tanh',
 }
+
 
 TRAIN_PARAMS.update(RNN_PARAMS)
 TRAIN_PARAMS.update({
-    'diff_lr_times': {'crf': 500,  'logit': 500, 'lstm': 100, 'word_enhance':100},
+    'lr': 0.005,
+    'decay_rate': 0.95,  # lr * decay_rate ^ (global_step / train_steps_per_epoch)
+    'embedding_dropout': 0.2,
+    'early_stop_ratio': 2 # stop after no improvement after 1.5 epochs
 })

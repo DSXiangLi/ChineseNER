@@ -20,11 +20,18 @@ def build_graph(features, labels, params, is_training):
     # load_bert_checkpoint(params['pretrain_dir'])  # load pretrain bert weight from checkpoint
 
     # use pretrain character embedding
-    embedding = tf.nn.embedding_lookup(params['embedding'], input_ids)
+    with tf.variable_scope('embedding'):
+        embedding = tf.nn.embedding_lookup(params['embedding'], input_ids)
+        embedding = tf.layers.dropout(embedding, seed=1234, rate=params['embedding_dropout'],
+                                      training=is_training)
+        add_layer_summary(embedding.name, embedding)
 
     lstm_output = bilstm(embedding, params['cell_type'], params['rnn_activation'],
                          params['hidden_units_list'], params['keep_prob_list'],
-                         params['cell_size'], params['dtype'], is_training)
+                         params['cell_size'], seq_len, params['dtype'], is_training)
+
+    lstm_output = tf.layers.dropout(lstm_output, seed=1234, rate=params['embedding_dropout'],
+                                      training=is_training)
 
     logits = tf.layers.dense(lstm_output, units=params['label_size'], activation=None,
                              use_bias=True, name='logits')
@@ -41,11 +48,15 @@ RNN_PARAMS = {
     'cell_type': 'lstm',
     'cell_size': 1,
     'hidden_units_list': [128],
-    'keep_prob_list': [0.8],
-    'rnn_activation': 'relu'
+    'keep_prob_list': [1],
+    'rnn_activation': 'tanh'
 }
 
 TRAIN_PARAMS.update(RNN_PARAMS)
 TRAIN_PARAMS.update({
-    'diff_lr_times': {'crf': 500,  'logit': 500 , 'lstm': 100}
+
+    'lr': 0.005,
+    'decay_rate': 0.95,  # lr * decay_rate ^ (global_step / train_steps_per_epoch)
+    'embedding_dropout': 0.3,
+    'early_stop_ratio': 2 # stop after no improvement after 1.5 epochs
 })
