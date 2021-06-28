@@ -119,15 +119,17 @@ class BasicTFRecord(object):
 
     def format_sequence(self, seq):
         """
-        truncate sequence to max_len
-        add [CLS], [SEP], [PAD]
+        For Bert model: add [CLS] at beginning, [SEP] in the end, then do padding
+        For non-bert model: only do padding
         """
-        len_seq = len(seq)
-        if len_seq > self.max_seq_len - 2:
+        if self.tokenizer_type == TokenizerBert:
             seq = seq[:(self.max_seq_len-2)]
+            seq = ['[CLS]'] + seq + ['[SEP]']
+        else:
+            seq = seq[: self.max_seq_len]
+        len_seq = len(seq)
 
-        seq = ['[CLS]'] + seq + ['[SEP]']
-        seq += ['[PAD]'] * (self.max_seq_len - 2 - len_seq)
+        seq += ['[PAD]'] * (self.max_seq_len - len_seq)
         return seq
 
     def build_feature(self, sentence, tag):
