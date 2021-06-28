@@ -8,7 +8,7 @@ TRAIN_PARAMS = {
     'log_steps': 100,
     'pretrain_dir': './pretrain_model/ch_google', # pretrain Bert-Model
     'batch_size': 32,
-    'epoch_size': 20,
+    'epoch_size': 50,
     'embedding_dropout': 0.1,
     'warmup_ratio': 0.1,
     'early_stop_ratio': 1 # stop after ratio * steps_per_epoch
