@@ -24,7 +24,7 @@ def build_rnn_cell(cell_type, activation, hidden_units_list, keep_prob_list, cel
     )
 
 
-def bilstm(embedding, cell_type, activation, hidden_units_list, keep_prob_list, cell_size, dtype, is_training):
+def bilstm(embedding, cell_type, activation, hidden_units_list, keep_prob_list, cell_size, seq_len, dtype, is_training):
     with tf.variable_scope('bilstm_layer'):
         if not is_training:
             keep_prob_list = len(keep_prob_list) * [1.0]
@@ -32,7 +32,7 @@ def bilstm(embedding, cell_type, activation, hidden_units_list, keep_prob_list, 
         bw = build_rnn_cell(cell_type, activation, hidden_units_list, keep_prob_list, cell_size)
 
         # tuple of 2 : batch_size * max_seq_len * hidden_size
-        outputs, _ = tf.nn.bidirectional_dynamic_rnn(fw, bw, embedding, dtype=dtype)
+        outputs, _ = tf.nn.bidirectional_dynamic_rnn(fw, bw, embedding, seq_len, dtype=dtype)
 
         # concat forward and backward along embedding axis
         outputs = tf.concat(outputs, axis=-1)  # batch_size * max_seq_len * (hidden_size * 2)
