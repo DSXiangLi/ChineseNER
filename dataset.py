@@ -30,13 +30,10 @@ class NerDataset(object):
             features['softword_ids'] = tf.cast(features['softword_ids'], tf.int32)
         elif self.surfix == ExSoftWord:
             # cast to float and reshape to original 2 dimension
-            features['ex_softword_ids'] = tf.reshape(
-                tf.cast(features['ex_softword_ids'], tf.float32), [-1, self.params['word_enhance_dim']])
+            features['ex_softword_ids'] = tf.cast(features['ex_softword_ids'], tf.float32)
         elif self.surfix == SoftLexicon:
-            features['softlexicon_ids'] = tf.reshape(
-                tf.cast(features['softlexicon_ids'], tf.int32), [-1, self.params['word_enhance_dim']])
-            features['softlexicon_weights'] = tf.reshape(
-                tf.cast(features['softlexicon_weights'], tf.float32), [-1, self.params['word_enhance_dim']])
+            features['softlexicon_ids'] = tf.cast(features['softlexicon_ids'], tf.int32)
+            features['softlexicon_weights'] = tf.cast(features['softlexicon_weights'], tf.float32)
         return features
 
     def build_input_fn(self, file_name, is_predict=0, unbatch=False):
@@ -130,7 +127,7 @@ class MultiDataset(object):
 
 
 if __name__ == '__main__':
-    prep = NerDataset('./data/msra', 1, 10, model_name='bert_bilstm_crf')
+    prep = NerDataset('./data/msra', 100, 10, model_name='bilstm_crf_softlexicon')
     train_input = prep.build_input_fn('train')
 
     sess = tf.Session()
@@ -153,7 +150,7 @@ if __name__ == '__main__':
     print(features['task_ids'])
 
 
-    prep = MultiDataset('./data', ['msra','people_daily'], 4 , 2)
+    prep = MultiDataset('./data', ['msra','people_daily'], 4 , 2,'bert_bilstm_crf')
     train_input = prep.build_predict_fn('msra')
     sess = tf.Session()
     iterator = tf.data.make_initializable_iterator(train_input())
@@ -163,3 +160,10 @@ if __name__ == '__main__':
     features = sess.run( iterator.get_next() )
     print(features['labels'])
     print(features['task_ids'])
+
+
+    for i in range(10):
+        features = sess.run(iterator.get_next())
+        print([j.decode() for j in features['tokens'][0][:features['seq_len'][0]]])
+        print(features['token_ids'][0][:features['seq_len'][0]])
+        print(features['labels'][0][:features['seq_len'][0]])

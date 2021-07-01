@@ -14,6 +14,7 @@ def build_graph(features, labels, params, is_training):
 
     seq_len = features['seq_len']
     ex_softword_ids = features['ex_softword_ids'] # bathc * ma_seq * word_enhance_dim
+    ex_softword_ids = tf.reshape(ex_softword_ids, [-1, params['max_seq_len'], params['word_enhance_dim']])
 
     with tf.variable_scope('embedding'):
         embedding = tf.nn.embedding_lookup(params['embedding'], input_ids)
@@ -27,11 +28,11 @@ def build_graph(features, labels, params, is_training):
             shape=[params['word_enhance_dim'], emb_dim],
             initializer=tf.truncated_normal_initializer(), name='ex_softword_embedding')
         wh_embedding = tf.matmul(ex_softword_ids, softword_embedding) #max_seq_len * emb_dim
+        add_layer_summary('ex_softword', softword_embedding)
         wh_embedding = tf.layers.dropout(wh_embedding, rate=params['embedding_dropout'],
                                       seed=1234, training=is_training)
         embedding = tf.concat([wh_embedding, embedding], axis=-1) # concat word enhance with token embedding
-        add_layer_summary(softword_embedding.name, softword_embedding)
-        add_layer_summary(embedding.name, embedding)
+
 
     lstm_output = bilstm(embedding, params['cell_type'], params['rnn_activation'],
                          params['hidden_units_list'], params['keep_prob_list'],
@@ -64,6 +65,6 @@ TRAIN_PARAMS.update({
 
     'lr': 0.005,
     'decay_rate': 0.95,  # lr * decay_rate ^ (global_step / train_steps_per_epoch)
-    'embedding_dropout': 0.2,
-    'early_stop_ratio': 2 # stop after no improvement after 1.5 epochs
+    'embedding_dropout': 0.3,
+    'early_stop_ratio': 1 # stop after no improvement after 1.5 epochs
 })

@@ -243,12 +243,15 @@ class SoftwordTFRecord(BasicTFRecord):
         self.soft2idx = Soft2Idx
 
     def format_soft_seq(self, seq):
+        default_label_encoding = self.soft2idx['None']
+        if self.tokenizer_type == TokenizerBert:
+            seq = seq[:(self.max_seq_len - 2)]
+            seq = [default_label_encoding] + seq + [default_label_encoding]
+        else:
+            seq = seq[:self.max_seq_len]
         len_seq = len(seq)
-        if len_seq > self.max_seq_len - 2:
-            seq = seq[:(self.max_seq_len-2)]
 
-        seq = [self.soft2idx['None']] + seq + [self.soft2idx['None']]
-        seq += [self.soft2idx['None']] * (self.max_seq_len - 2 - len_seq)
+        seq += [default_label_encoding] * (self.max_seq_len - len_seq)
         return seq
 
     def build_feature(self, sentence, tag):
@@ -283,14 +286,17 @@ class ExSoftwordTFRecord(BasicTFRecord):
         self.soft2idx = Soft2Idx
 
     def format_soft_seq(self, seq):
-        len_seq = len(seq)
-        if len_seq > self.max_seq_len - 2:
-            seq = seq[:(self.max_seq_len-2)]
-
         default_one_hot = [0] * len(self.soft2idx)
         default_one_hot[self.soft2idx['None']] = 1 #[0,0,0,0,1] for cls,sep,pad
-        seq = [default_one_hot] + seq + [default_one_hot]
-        seq += [default_one_hot] * (self.max_seq_len - 2 - len_seq)
+
+        if self.tokenizer_type == TokenizerBert:
+            seq = seq[:(self.max_seq_len - 2)]
+            seq = [default_one_hot] + seq + [default_one_hot]
+        else:
+            seq = seq[:self.max_seq_len]
+        len_seq = len(seq)
+
+        seq += [default_one_hot] * (self.max_seq_len - len_seq)
         return seq
 
     def build_feature(self, sentence, tag):
@@ -349,17 +355,19 @@ class SoftLexiconTFRecord(BasicTFRecord):
         return vocab2idx
 
     def format_soft_seq(self, seq, type='ids'):
-        len_seq = len(seq)
-        if len_seq > self.max_seq_len - 2:
-            seq = seq[:(self.max_seq_len-2)]
-
-        if type =='weight':
+        if type == 'weight':
             default_encoding = [0.0] * len(seq[0])
         else:
             default_encoding = [0] * len(seq[0])
 
-        seq = [default_encoding] + seq + [default_encoding]
-        seq += [default_encoding] * (self.max_seq_len - 2 - len_seq)
+        if self.tokenizer_type == TokenizerBert:
+            seq = seq[:(self.max_seq_len-2)]
+            seq = [default_encoding] + seq + [default_encoding]
+        else:
+            seq = seq[:self.max_seq_len]
+        len_seq = len(seq)
+
+        seq += [default_encoding] * (self.max_seq_len - len_seq)
         return seq
 
     def build_feature(self, sentence, tag):

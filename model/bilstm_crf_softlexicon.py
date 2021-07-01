@@ -1,8 +1,13 @@
 # -*-coding:utf-8 -*-
-from tools.train_utils import *
 from tools.layer import *
 from tools.utils import add_layer_summary
 from config import TRAIN_PARAMS
+
+
+def reshape_input(input_, params):
+    input_ = tf.reshape(input_, [-1, params['max_seq_len'],
+                                 int(params['word_enhance_dim'] * params['max_lexicon_len'])])
+    return input_
 
 
 def build_graph(features, labels, params, is_training):
@@ -13,8 +18,9 @@ def build_graph(features, labels, params, is_training):
     label_ids = features['label_ids']
 
     seq_len = features['seq_len']
-    softlexicon_ids = features['softlexicon_ids'] # batch_size * max_seq_len *(len(soft2idx) * max_lexicon_len)
-    softlexicon_weights = features['softlexicon_weights'] # same size as softlexicon_ids
+    # reshape -> batch, max_seq_len ,word_enhance_dim * max_lexicon_len
+    softlexicon_ids = reshape_input(features['softlexicon_ids'], params)
+    softlexicon_weights = reshape_input(features['softlexicon_weights'], params)
 
     with tf.variable_scope('embedding'):
         embedding = tf.nn.embedding_lookup(params['embedding'], input_ids)
@@ -30,22 +36,24 @@ def build_graph(features, labels, params, is_training):
         word_embedding_dim = softword_embedding.shape.as_list()[-1]
         wh_embedding = tf.nn.embedding_lookup(softword_embedding, softlexicon_ids) # max_seq_len * 50(MaxLexicon * len(SoftIdx)) * emb_dim
         wh_embedding = tf.multiply(wh_embedding, tf.expand_dims(softlexicon_weights, axis=-1))
-        # Method1: weighted average lexicons in each B/M/E/S/None and concatenate -> 5 * emb_dim
-        wh_embedding = tf.reshape(wh_embedding, [-1, params['max_seq_len'], params['word_enhance_dim'] ,
+        # Method1: weighted average lexicons in each B/M/E/S and concatenate -> 4 * emb_dim
+        wh_embedding = tf.reshape(wh_embedding, [-1, params['max_seq_len'], params['word_enhance_dim'],
                                                  params['max_lexicon_len'], word_embedding_dim])
-        wh_embedding = tf.reduce_mean(wh_embedding, axis=-2)
+        wh_embedding = tf.reduce_sum(wh_embedding, axis=3)
         wh_embedding = tf.reshape(wh_embedding, [-1, params['max_seq_len'],
                                                  int(params['word_enhance_dim'] * word_embedding_dim)])
+        add_layer_summary('wh_embedding', wh_embedding)
 
         wh_embedding = tf.layers.dropout(wh_embedding, rate=params['embedding_dropout'],
                                          seed=1234, training=is_training)
         embedding = tf.concat([wh_embedding, embedding], axis=-1)
-        add_layer_summary('wh_embedding', wh_embedding)
-        add_layer_summary(embedding.name, embedding)
 
     lstm_output = bilstm(embedding, params['cell_type'], params['rnn_activation'],
                          params['hidden_units_list'], params['keep_prob_list'],
                          params['cell_size'], seq_len, params['dtype'], is_training)
+
+    lstm_output = tf.layers.dropout(lstm_output, seed=1234, rate=params['embedding_dropout'],
+                                      training=is_training)
 
     logits = tf.layers.dense(lstm_output, units=params['label_size'], activation=None,
                              use_bias=True, name='logits')
@@ -61,16 +69,16 @@ def build_graph(features, labels, params, is_training):
 RNN_PARAMS = {
     'cell_type': 'lstm',
     'cell_size': 1,
-    'hidden_units_list': [128],
-    'keep_prob_list': [1],
+    'hidden_units_list': [200], # 128 for people_daily ,200 for msra
+    'keep_prob_list': [0.9],
     'rnn_activation': 'tanh',
 }
 
 
 TRAIN_PARAMS.update(RNN_PARAMS)
 TRAIN_PARAMS.update({
-    'lr': 0.005,
+    'lr': 0.0015,
     'decay_rate': 0.95,  # lr * decay_rate ^ (global_step / train_steps_per_epoch)
-    'embedding_dropout': 0.2,
-    'early_stop_ratio': 2 # stop after no improvement after 1.5 epochs
+    'embedding_dropout': 0.5,
+    'early_stop_ratio': 1 # stop after no improvement after 1.5 epochs
 })
