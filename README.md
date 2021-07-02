@@ -8,24 +8,28 @@ Requirement: tensorflow 1.14, seqeval 1.2.2, bert-base 0.0.9
 2. 分词：MSR【只用于增强实体识别效果不单独使用】
 
 ### 支持模型
-1. 单任务
+1. 字符输入单任务
 - bilstm_crf
 - bert_ce
 - bert_crf
 - bert_bilstm_crf
 - bert_cnn_crf
 - bert_bilstm_crf_bigram
-- bert_bilstm_crf_softword
-- bert_bilstm_crf_ex_softword
-- bert_bilstm_crf_softlexicon
+  
+2. 词汇增强
+- bilstm_crf_softword
+- bilstm_crf_ex_softword
+- bilstm_crf_softlexicon
 
-2. 多任务
+3. 多任务
 - bert_bilstm_crf_mtl: 共享Bert的多任务联合学习,部分参考 paper/Improving Named Entity Recognition for Chinese Social Media with Word Segmentation Representation Learning
 - bert_bilstm_crf_adv: 对抗迁移联合学习,部分参考 paper/adversarial transfer learning for Chinese Named Entity Recognition with Self-Attention Mechanism
 
 ### Run 
 1. pretrain_model中下载对应预训练模型到对应Folder，具体详见Folder中README.md
-2. data中运行对应数据集preprocess.py得到tfrecord和data_params，这里用了Bert的wordPiece tokenizer，所以依赖以上预训练的vocab文件
+2. data中运行对应数据集preprocess.py得到tfrecord和data_params，训练会根据model_name选择以下tokenizer生成的tfrecord
+   - Bert类模型用了wordPiece tokenizer，依赖以上预训练Bert模型的vocab文件
+   - 非Bert类模型，包括词汇增强模型用了Giga和ctb50的预训练词向量
 3. 运行单任务NER模型
 ```python
 python main.py --model bert_bilstm_crf --data msra

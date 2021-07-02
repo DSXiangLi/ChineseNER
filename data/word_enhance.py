@@ -270,7 +270,7 @@ def build_soft_lexicon(sentence, verbose=False):
                     soft_lexicon[i]['B'].add(word)
                     soft_lexicon[j]['E'].add(word)
                     for k in range(i+1, j):
-                        soft_lexicon[j]['M'].add(word)
+                        soft_lexicon[k]['M'].add(word)
         for key, val in soft_lexicon[i].items():
             if not val:
                 # eg.no matching E soft lexicon, fill in with None Token
