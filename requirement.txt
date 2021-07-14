@@ -9,12 +9,13 @@ cached-property           1.5.2                    pypi_0    pypi
 certifi                   2021.5.30        py36hecd8cb5_0  
 dataclasses               0.8                      pypi_0    pypi
 gast                      0.5.0                    pypi_0    pypi
-gensim                    4.0.1                    pypi_0    pypi
+gensim                    3.8.3                    pypi_0    pypi
 google-pasta              0.2.0                    pypi_0    pypi
 gputil                    1.4.0                    pypi_0    pypi
 grpcio                    1.36.1                   pypi_0    pypi
 h5py                      3.1.0                    pypi_0    pypi
 importlib-metadata        4.6.1                    pypi_0    pypi
+jieba                     0.42.1                   pypi_0    pypi
 joblib                    1.0.1                    pypi_0    pypi
 keras-applications        1.0.8                    pypi_0    pypi
 keras-preprocessing       1.1.2                    pypi_0    pypi
@@ -24,9 +25,12 @@ markdown                  3.3.4                    pypi_0    pypi
 ncurses                   6.2                  h0a44026_1  
 numpy                     1.19.5                   pypi_0    pypi
 openssl                   1.1.1k               h9ed2024_0  
+pandas                    1.1.5                    pypi_0    pypi
 pip                       21.1.3           py36hecd8cb5_0  
 protobuf                  3.17.3                   pypi_0    pypi
 python                    3.6.13               h88f2d9e_0  
+python-dateutil           2.8.1                    pypi_0    pypi
+pytz                      2021.1                   pypi_0    pypi
 pyzmq                     22.1.0                   pypi_0    pypi
 readline                  8.1                  h9ed2024_0  
 scikit-learn              0.24.2                   pypi_0    pypi

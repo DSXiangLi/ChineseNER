@@ -2,6 +2,7 @@
 import grpc
 import tensorflow as tf
 import numpy as np
+import re
 from tensorflow_serving.apis import predict_pb2, prediction_service_pb2_grpc
 from tensorflow.python.framework import tensor_util
 
@@ -9,10 +10,9 @@ from data.base_preprocess import get_instance, extract_prefix_surfix
 from data.tokenizer import TokenizerBert
 from tools.infer_utils import extract_entity, fix_tokens, timer, grpc_retry
 
-MODEL = 'bilstm_crf_softword'
+MODEL = 'bert_bilstm_crf_mtl'
 SERVER = 'localhost:8500'
 VERSION = 1
-MTL = 0 # true for mtl and adv model
 MAX_SEQ_LEN = 150
 TIMEOUT = 10
 
@@ -29,10 +29,12 @@ TAG2IDX = {
     '[SEP]': 9
 }
 
+
 class InferHelper(object):
-    def __init__(self, max_seq_len, tag2idx, model_name, version, server, timeout, mtl):
+    def __init__(self, max_seq_len, tag2idx, model_name, version, server, timeout):
         self.model_name = model_name
         self.word_enhance, self.tokenizer_type = extract_prefix_surfix(model_name)
+        self.mtl = 1 if re.search('(mtl)|(adv)', model_name) else 0  # whether is multitask
         self.proc = get_instance(self.tokenizer_type, max_seq_len, tag2idx,
                                  word_enhance=self.word_enhance, mapping=None)
         self.max_seq_len = max_seq_len
@@ -41,7 +43,6 @@ class InferHelper(object):
         self.server = server
         self.version = version
         self.timeout = timeout
-        self.mtl = mtl # for multitask add task_id=1
 
     def get_stub(self):
         channel = grpc.insecure_channel(self.server)
@@ -64,7 +65,6 @@ class InferHelper(object):
         self.feature['label_ids'] = np.zeros(shape=(self.max_seq_len,)).astype(int).tolist()
 
         if self.mtl:
-            # bert_biltm_crf_mtl, bert_bilstm_crf_adv. Default Task=1 is main task, task=0 is aux task
             self.feature['task_ids'] = 1
 
         if self.tokenizer_type == TokenizerBert:
@@ -94,7 +94,7 @@ class InferHelper(object):
 
 
 # create singleton for inference, trigger all lazy eval before online inference
-infer_handle = InferHelper(MAX_SEQ_LEN, TAG2IDX, MODEL, VERSION, SERVER, timeout=TIMEOUT, mtl=MTL)
+infer_handle = InferHelper(MAX_SEQ_LEN, TAG2IDX, MODEL, VERSION, SERVER, timeout=TIMEOUT)
 
 
 if __name__ == '__main__':

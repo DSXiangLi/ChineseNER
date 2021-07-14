@@ -1,31 +1,17 @@
 # 中文NER的那些事儿
 
-Requirement: tensorflow 1.14, seqeval 1.2.2, bert-base 0.0.9
-
-### 数据集
-细节详见data中README
-1. 实体识别: MSRA, people_daily
-2. 分词：MSR【只用于增强实体识别效果不单独使用】
-
 ### 支持模型
-1. 字符输入单任务
-- bilstm_crf
-- bert_ce
-- bert_crf
-- bert_bilstm_crf
-- bert_cnn_crf
-- bert_bilstm_crf_bigram
+1. 字符输入单任务:
+bilstm_crf，bert_ce，bert_crf，bert_bilstm_crf，bert_cnn_crf，bert_bilstm_crf_bigram
   
-2. 词汇增强
-- bilstm_crf_softword
-- bilstm_crf_ex_softword
-- bilstm_crf_softlexicon
+2. 词汇增强:
+bilstm_crf_softword，bilstm_crf_ex_softword，bilstm_crf_softlexicon
 
 3. 多任务
-- bert_bilstm_crf_mtl: 共享Bert的多任务联合学习,部分参考 paper/Improving Named Entity Recognition for Chinese Social Media with Word Segmentation Representation Learning
-- bert_bilstm_crf_adv: 对抗迁移联合学习,部分参考 paper/adversarial transfer learning for Chinese Named Entity Recognition with Self-Attention Mechanism
+- bert_bilstm_crf_mtl: 共享Bert的多任务联合学习
+- bert_bilstm_crf_adv: 对抗迁移联合学习
 
-### Run 
+### 训练&评估
 1. pretrain_model中下载对应预训练模型到对应Folder，具体详见Folder中README.md
 2. data中运行对应数据集preprocess.py得到tfrecord和data_params，训练会根据model_name选择以下tokenizer生成的tfrecord
    - Bert类模型用了wordPiece tokenizer，依赖以上预训练Bert模型的vocab文件
@@ -60,9 +46,40 @@ python evaluation.py --model bert_crf,bert_bilstm_crf,bert_bilstm_crf_mtl_msra_m
   <img src="https://files.mdnice.com/user/8955/c13cf469-76d6-47b2-a99a-b19083cfae4b.png"  width="70%" />
 </p>
 
+### 推理
+1. 下载docker https://docs.docker.com/get-docker/
+   
+2. 下载tf docker image 
+```bash
+docker pull tensorflow/serving_model:1.14.0
+```
+
+3. warmup (optional), serving_model中提供的3个模型已经运行过warmup
+
+```python
+python warmup.py
+```
+
+4. run server: server会从inferece.py中读取推理用的model_name 
+```bash
+bash server.sh
+```
+
+5. run client: 输入文本返回预测
+
+```python 
+python inference.py 
+```
+
+下图为无warmp的infer latency
+![Infer with warmup](./serving_model/img.png)
+下图为加入warmup后的infer latency
+![img_1.png](./serving_model/img_1.png)
+
 ### 博客
 [中文NER的那些事儿1. Bert-Bilstm-CRF基线模型详解&代码实现](https://www.cnblogs.com/gogoSandy/p/14716671.html)
 
 [中文NER的那些事儿2. 多任务，对抗迁移学习详解&代码实现](https://www.cnblogs.com/gogoSandy/p/14773792.html)
 
 [中文NER的那些事儿3. SoftLexicon等词汇增强详解&代码实现 ](https://www.cnblogs.com/gogoSandy/p/14965711.html)
+
