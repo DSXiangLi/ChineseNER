@@ -120,6 +120,7 @@ class MultiDataset(object):
         self._params['step_per_epoch'] = int(max([p['step_per_epoch'] for p in self._params.values()]))
         self._params['num_train_steps'] = int(self.epoch_size * self._params['step_per_epoch'])
         self._params['task_list'] = self.data_list
+        self._params['max_seq_len'] = self._params[self.data_list[0]]['max_seq_len']
 
     @property
     def params(self):
@@ -138,19 +139,7 @@ if __name__ == '__main__':
     features = sess.run( iterator.get_next() )
     print(features)
 
-    prep = MultiDataset('./data', ['msra','people_daily'], 4 , 2)
-    train_input = prep.build_input_fn('train')
-    sess = tf.Session()
-    iterator = tf.data.make_initializable_iterator(train_input())
-    sess.run( iterator.initializer )
-    sess.run( tf.tables_initializer() )
-    sess.run( tf.global_variables_initializer() )
-    features = sess.run( iterator.get_next() )
-    print(features['labels'])
-    print(features['task_ids'])
-
-
-    prep = MultiDataset('./data', ['msra','people_daily'], 4 , 2,'bert_bilstm_crf')
+    prep = MultiDataset('./data', ['msr','msra'], 4 , 2,'bert_bilstm_crf_mtl')
     train_input = prep.build_predict_fn('msra')
     sess = tf.Session()
     iterator = tf.data.make_initializable_iterator(train_input())
@@ -161,9 +150,3 @@ if __name__ == '__main__':
     print(features['labels'])
     print(features['task_ids'])
 
-
-    for i in range(10):
-        features = sess.run(iterator.get_next())
-        print([j.decode() for j in features['tokens'][0][:features['seq_len'][0]]])
-        print(features['token_ids'][0][:features['seq_len'][0]])
-        print(features['labels'][0][:features['seq_len'][0]])

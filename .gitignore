@@ -4,3 +4,8 @@ data/*/*.tfrecord
 .idea/
 pretrain_model/*/*.ckpt*
 pretrain_model/*/*.bz2
+pretrain_model/ctb50/*.vec
+pretrain_model/*/*.vectmp
+*/__pycache__/*
+*/*/__pycache__/*
+__pycache__/

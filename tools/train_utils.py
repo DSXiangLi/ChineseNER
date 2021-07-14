@@ -125,11 +125,18 @@ def build_model_fn(model_name):
             spec = tf.estimator.EstimatorSpec(mode=mode, loss=loss, eval_metric_ops=metric)
 
         else:
-            #For serving, only keep pred_ids in inference
-            spec = tf.estimator.EstimatorSpec(mode, {'pred_ids': pred_ids,
+            #For serving_model, only keep pred_ids in inference
+            output = {
+                'serving_default': tf.estimator.export.PredictOutput(
+                    {'pred_ids': pred_ids}
+                )
+            }
+            #For offline predict with true label, pass through label
+            spec = tf.estimator.EstimatorSpec(mode, predictions={'pred_ids': pred_ids,
                                                      'label_ids': features['label_ids'],
                                                      'tokens': features['tokens']
-                                                     })
+                                                     },
+                                              export_outputs=output)
         return spec
     return model_fn
 
@@ -171,11 +178,17 @@ def build_mtl_model_fn(model_name):
                                        params[params['task_list'][1]]['idx2tag'], task_name=params['task_list'][1]))
             spec = tf.estimator.EstimatorSpec(mode=mode, loss=loss, eval_metric_ops=metric_op)
         else:
-            #For serving, only keep pred_ids in inference
+            #For serving_model, only keep pred_ids in inference
+            output = {
+                'serving_default': tf.estimator.export.PredictOutput(
+                    {'pred_ids': pred_ids}
+                )
+            }
             spec = tf.estimator.EstimatorSpec(mode, {'pred_ids': pred_ids,
                                                      'label_ids': features['label_ids'],
                                                      'tokens': features['tokens']
-                                                     })
+                                                     },
+                                              export_outputs=output)
         return spec
     return model_fn
 

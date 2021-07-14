@@ -47,6 +47,7 @@ VocabEmbedding = None
 def model_init():
     # lazy load all model and embedding needed for word enhance
     global model, VocabFreq, Vocab2IDX, VocabEmbedding, N_word
+    jieba.initialize() # global initialization
     if model is None:
         print('loading w2v pretrain model {}.It is very very slow, please be patient~~'.format(
             PretrainModel))

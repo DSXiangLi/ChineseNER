@@ -13,6 +13,12 @@ from data.word_enhance import (align_with_token, build_softword, build_ex_softwo
 from data.tokenizer import TokenizerGiga, TokenizerBert
 
 
+class DotDict(dict):
+    __getattr__ = dict.__getitem__
+    __setattr__ = dict.__setitem__
+    __delattr__ = dict.__delitem__
+
+
 def extract_prefix_surfix(model_name):
     """
     Infer word_enhance and tokenizer type from model name
@@ -25,18 +31,6 @@ def extract_prefix_surfix(model_name):
     tokenizer_type = re.search('({})'.format(TokenizerBert), model_name)
     tokenizer_type = tokenizer_type.group() if tokenizer_type else TokenizerGiga
     return word_enhance, tokenizer_type
-
-
-class TrainFeature:
-    def __init__(self, tokens, token_ids, mask,
-                 segment_ids, labels, label_ids, seq_len):
-        self.tokens = tokens
-        self.token_ids = token_ids
-        self.mask = mask
-        self.segment_ids = segment_ids
-        self.labels = labels
-        self.label_ids = label_ids
-        self.seq_len = seq_len
 
 
 def get_feature_poroto(max_seq_len, word_enhance=None):
@@ -73,23 +67,22 @@ def get_feature_poroto(max_seq_len, word_enhance=None):
     return feature_proto
 
 
-def get_instance(data_dir, file_name, tokenizer_type,
-                 max_seq_len, tag2idx, mapping, load_data_func, word_enhance=None, **kwargs):
+def get_instance(tokenizer_type, max_seq_len, tag2idx, mapping=None, word_enhance=None, **kwargs):
     # Init instance with different cls, and dynamic add data specific load_data func to instance
     assert word_enhance in [None]+WordEnhanceMethod, 'word_enhance must in {}'.format(','.join(WordEnhanceMethod))
 
     if word_enhance is None:
-        cls = BasicTFRecord
+        cls = BasicProc
     else:
         model_init() # run lazy variable loading
         if word_enhance == SoftWord:
-            cls = SoftwordTFRecord
+            cls = SoftwordProc
         elif word_enhance == ExSoftWord:
-            cls = ExSoftwordTFRecord
+            cls = ExSoftwordProc
         else:
-            cls = SoftLexiconTFRecord
+            cls = SoftLexiconProc
 
-    instance = cls(data_dir, file_name, tokenizer_type, max_seq_len, tag2idx, mapping, load_data_func, **kwargs)
+    instance = cls(tokenizer_type, max_seq_len, tag2idx, mapping, **kwargs)
     return instance
 
 
@@ -101,10 +94,42 @@ def read_text(data_dir, filename):
     return data
 
 
-class BasicTFRecord(object):
-    def __init__(self, data_dir, file_name, tokenizer_type, max_seq_len, tag2idx, mapping, load_data_func):
-        self.data_dir = data_dir
-        self.file_name = file_name
+def tf_string_feature(value):
+    if not isinstance(value, list):
+        value = [value]
+    return tf.train.Feature(bytes_list=tf.train.BytesList(value=[bytes(i, encoding='UTF-8') for i in value]))
+
+
+def tf_int_feature(value):
+    if not isinstance(value, list):
+        value = [value]
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=value))
+
+
+def tf_float_feature(value):
+    if not isinstance(value, list):
+        value = [value]
+    return tf.train.Feature(float_list=tf.train.FloatList(value=value))
+
+
+FeatureSchema = {
+    'tokens': tf_string_feature,
+    'token_ids': tf_int_feature,
+    'mask': tf_int_feature,
+    'segment_ids': tf_int_feature,
+    'labels': tf_string_feature,
+    'label_ids': tf_int_feature,
+    'seq_len': tf_int_feature,
+    'softword_ids': tf_int_feature,
+    'ex_softword_ids': tf_int_feature,
+    'softlexicon_ids': tf_int_feature,
+    'softlexicon_weights': tf_float_feature,
+    'task_ids': tf_int_feature, # for multitask only
+}
+
+
+class BasicProc(object):
+    def __init__(self, tokenizer_type, max_seq_len, tag2idx, mapping):
         self.max_seq_len = max_seq_len
         self.tag2idx = tag2idx
         # get certain tokenizer
@@ -112,8 +137,16 @@ class BasicTFRecord(object):
         self.mapping = mapping
         self.word_enhance = None # used to distinguish basic tfrecord from other word_enhance tfrecord
         self.tokenizer_type = tokenizer_type # used to distinguish tfrecord for bert model from other None bert model
-        self.load_data = load_data_func # pass in load_data_func given differnt dataset
-        self.sentence_list, self.tag_list = self.load_data(self.data_dir, self.file_name)
+        # data specific attr, not needed in inference
+        self.data_dir = None
+        self.file_name = None
+        self.sentence_list = None
+        self.tag_list = None
+
+    def init_data(self, data_dir, file_name, load_data_func):
+        self.data_dir = data_dir
+        self.file_name = file_name
+        self.sentence_list, self.tag_list = load_data_func(data_dir, file_name)
 
     @property
     def rename_file(self):
@@ -129,63 +162,45 @@ class BasicTFRecord(object):
             seq = ['[CLS]'] + seq + ['[SEP]']
         else:
             seq = seq[: self.max_seq_len]
-        len_seq = len(seq)
+        seq_len = len(seq)
 
-        seq += ['[PAD]'] * (self.max_seq_len - len_seq)
-        return seq
+        seq += ['[PAD]'] * (self.max_seq_len - seq_len)
+        return seq, seq_len
 
-    def build_feature(self, sentence, tag):
+    def build_seq_feature(self, sentence):
         tokens = self.tokenizer.tokenize(sentence)
-
-        tags = tag.split(' ')
-
-        assert len(tokens)==len(tags), '{}!={} n_token!=n_tag'.format(len(tokens), len(tags))
-        tokens = self.format_sequence(tokens)
-        labels = self.format_sequence(tags)
-
+        tokens, seq_len = self.format_sequence(tokens)
         token_ids = self.tokenizer.convert_tokens_to_ids(tokens)
-        label_ids = [self.tag2idx[i] for i in labels]
-        real_len = sum([i>0for i in label_ids])
-
         segment_ids = [0] * self.max_seq_len
-        mask = [1] * (real_len) + [0] * (self.max_seq_len - real_len)
+        mask = [1] * seq_len + [0] * (self.max_seq_len - seq_len)
 
         assert len(tokens) == self.max_seq_len
         assert len(token_ids) == self.max_seq_len
+        assert len(mask) == self.max_seq_len
+        return DotDict({'tokens': tokens, 'token_ids': token_ids,
+                        'segment_ids': segment_ids, 'mask': mask, 'seq_len': seq_len})
+
+    def build_tag_feature(self, tag):
+        tags = tag.split(' ')
+        labels, label_len = self.format_sequence(tags)
+        label_ids = [self.tag2idx[i] for i in labels]
         assert len(labels) == self.max_seq_len
         assert len(label_ids) == self.max_seq_len
-        assert len(segment_ids) == self.max_seq_len
-        assert len(mask) == self.max_seq_len
-        return TrainFeature(tokens, token_ids, mask, segment_ids, labels, label_ids, real_len)
+        return DotDict({'labels': labels, 'label_ids': label_ids, 'label_len': label_len})
 
-    @staticmethod
-    def string_feature(value):
-        if not isinstance(value, list):
-            value = [value]
-        return tf.train.Feature(bytes_list=tf.train.BytesList(value=[bytes(i, encoding='UTF-8') for i in value]))
+    def build_feature(self, sentence, tag):
+        f_seq = self.build_seq_feature(sentence)
+        f_label = self.build_tag_feature(tag)
+        assert f_seq.seq_len == f_label.label_len,\
+            'sentence = {}... {}!={} n_token!=n_tag'.format(sentence[:10], f_seq.seq_len, f_label.label_len)
 
-    @staticmethod
-    def int_feature(value):
-        if not isinstance(value, list):
-            value = [value]
-        return tf.train.Feature(int64_list=tf.train.Int64List(value=value))
-
-    @staticmethod
-    def float_feature(value):
-        if not isinstance(value, list):
-            value = [value]
-        return tf.train.Feature(float_list=tf.train.FloatList(value=value))
+        return DotDict({**f_seq, **f_label})
 
     def build_tf_feature(self, feature):
-        tf_feature = {
-            'tokens': self.string_feature(feature.tokens),
-            'token_ids': self.int_feature(feature.token_ids),
-            'mask': self.int_feature(feature.mask),
-            'segment_ids': self.int_feature(feature.segment_ids),
-            'labels': self.string_feature(feature.labels),
-            'label_ids': self.int_feature(feature.label_ids),
-            'seq_len': self.int_feature(feature.seq_len)
-        }
+        tf_feature = {}
+        for key, val in feature.items():
+            if key in FeatureSchema:
+                tf_feature[key] = FeatureSchema[key](val)
         return tf_feature
 
     def build_data_params(self, n_sample):
@@ -220,7 +235,6 @@ class BasicTFRecord(object):
                     )
                     writer.write(example.SerializeToString())
                 except Exception as e:
-                    print(e)
                     n_invalid_sample+=1
 
         print('Dump {} sample, invalid_sample = {}'.format(n_sample, n_invalid_sample))
@@ -236,9 +250,9 @@ class BasicTFRecord(object):
 ####################################
 
 
-class SoftwordTFRecord(BasicTFRecord):
-    def __init__(self, data_dir, file_name,  tokenizer_type, max_seq_len, tag2idx, mapping, load_data_func):
-        super(SoftwordTFRecord, self).__init__(data_dir, file_name,  tokenizer_type, max_seq_len, tag2idx, mapping, load_data_func)
+class SoftwordProc(BasicProc):
+    def __init__(self, tokenizer_type, max_seq_len, tag2idx, mapping):
+        super(SoftwordProc, self).__init__(tokenizer_type, max_seq_len, tag2idx, mapping)
         self.word_enhance = SoftWord
         self.soft2idx = Soft2Idx
 
@@ -254,23 +268,18 @@ class SoftwordTFRecord(BasicTFRecord):
         seq += [default_label_encoding] * (self.max_seq_len - len_seq)
         return seq
 
-    def build_feature(self, sentence, tag):
+    def build_seq_feature(self, sentence):
         """
-        add B/M/E/S labels for each token, using jieba word cut and do label encoding
-        softword_ids: max_seq_len * 1
+        Add additional softword ids into sequence feature
         """
-        train_feature = super().build_feature(sentence, tag)
+        f_seq = super().build_seq_feature(sentence)
         softword_ids = build_softword(sentence, False)
         if self.tokenizer_type == TokenizerBert:
             # for character tokenizer, no need to align with tokenizer
-            softword_ids = align_with_token(softword_ids, train_feature.tokens, word_enhance=self.word_enhance)
-        train_feature.softword_ids = self.format_soft_seq(softword_ids)
-        return train_feature
-
-    def build_tf_feature(self, feature):
-        tf_feature = super().build_tf_feature(feature)
-        tf_feature['softword_ids'] = self.int_feature(feature.softword_ids)
-        return tf_feature
+            softword_ids = align_with_token(softword_ids, f_seq.tokens, word_enhance=self.word_enhance)
+        softword_ids = self.format_soft_seq(softword_ids)
+        f_seq.softword_ids = softword_ids
+        return f_seq
 
     def build_data_params(self, n_sample):
         params = super().build_data_params(n_sample)
@@ -279,9 +288,9 @@ class SoftwordTFRecord(BasicTFRecord):
         return params
 
 
-class ExSoftwordTFRecord(BasicTFRecord):
-    def __init__(self, data_dir, file_name,  tokenizer_type, max_seq_len, tag2idx, mapping, load_data_func):
-        super(ExSoftwordTFRecord, self).__init__(data_dir, file_name, tokenizer_type, max_seq_len, tag2idx, mapping, load_data_func)
+class ExSoftwordProc(BasicProc):
+    def __init__(self, tokenizer_type, max_seq_len, tag2idx, mapping):
+        super(ExSoftwordProc, self).__init__(tokenizer_type, max_seq_len, tag2idx, mapping)
         self.word_enhance = ExSoftWord
         self.soft2idx = Soft2Idx
 
@@ -297,26 +306,18 @@ class ExSoftwordTFRecord(BasicTFRecord):
         len_seq = len(seq)
 
         seq += [default_one_hot] * (self.max_seq_len - len_seq)
+        # flatten to 1 dimension for tf input
+        seq = list(chain(*seq))
         return seq
 
-    def build_feature(self, sentence, tag):
-        """
-        getting all possible B/M/E/S for each token and do one-hot encoding
-        ex_softword_ids: max_seq_len * 5
-        """
-        train_feature = super().build_feature(sentence, tag)
+    def build_seq_feature(self, sentence):
+        f_seq = super().build_seq_feature(sentence)
         ex_softword_ids = build_ex_softword(sentence, False)
         if self.tokenizer_type == TokenizerBert:
             # for character tokenizer, no need to align with tokenizer
-            ex_softword_ids = align_with_token(ex_softword_ids, train_feature.tokens, word_enhance=self.word_enhance)
-        train_feature.ex_softword_ids = self.format_soft_seq(ex_softword_ids)
-        return train_feature
-
-    def build_tf_feature(self, feature):
-        tf_feature = super().build_tf_feature(feature)
-        ## flatten to 1 dimension
-        tf_feature['ex_softword_ids'] = self.int_feature(list(chain(*feature.ex_softword_ids)))
-        return tf_feature
+            ex_softword_ids = align_with_token(ex_softword_ids, f_seq.tokens, word_enhance=self.word_enhance)
+        f_seq.ex_softword_ids = self.format_soft_seq(ex_softword_ids)
+        return f_seq
 
     def build_data_params(self, n_sample):
         params = super().build_data_params(n_sample)
@@ -325,9 +326,9 @@ class ExSoftwordTFRecord(BasicTFRecord):
         return params
 
 
-class SoftLexiconTFRecord(BasicTFRecord):
-    def __init__(self, data_dir, file_name, tokenizer_type, max_seq_len, tag2idx, mapping, load_data_func, default_weight=True):
-        super(SoftLexiconTFRecord, self).__init__(data_dir, file_name, tokenizer_type, max_seq_len, tag2idx, mapping, load_data_func)
+class SoftLexiconProc(BasicProc):
+    def __init__(self, tokenizer_type, max_seq_len, tag2idx, mapping, default_weight=True):
+        super(SoftLexiconProc, self).__init__(tokenizer_type, max_seq_len, tag2idx, mapping)
         self.word_enhance = SoftLexicon # surfix = word enhance method
         self.soft2idx=Soft2Idx
         model_init() # Only used when cls is init outside get_instance
@@ -350,7 +351,7 @@ class SoftLexiconTFRecord(BasicTFRecord):
     @property
     def vocab2idx(self):
         # use lazy import and make sure model_init run ahead
-        vocab2idx = getattr(importlib.import_module('data.word_enhance'),'Vocab2IDX')
+        vocab2idx = getattr(importlib.import_module('data.word_enhance'), 'Vocab2IDX')
         assert vocab2idx, 'Soft2Idx is None, to use word enhance cls, run model_init first'
         return vocab2idx
 
@@ -368,30 +369,24 @@ class SoftLexiconTFRecord(BasicTFRecord):
         len_seq = len(seq)
 
         seq += [default_encoding] * (self.max_seq_len - len_seq)
+        seq = list(chain(*seq)) # flatten to 1 dimension
         return seq
 
-    def build_feature(self, sentence, tag):
+    def build_seq_feature(self, sentence):
         """
         getting all possible soft lexicon, truncate/pad to max len and calculate normalized weight
         softlexicon_ids: max_seq_len * (4 * MaxLexiconLen)
         softlexicon_weight: same shape as ids
         """
-        train_feature = super().build_feature(sentence, tag)
+        f_seq = super().build_seq_feature(sentence)
         soft_lexicon = build_soft_lexicon(sentence, False)
         if self.tokenizer_type == TokenizerBert:
             # for character tokenizer, no need to align with tokenizer
-            soft_lexicon = align_with_token(soft_lexicon, train_feature.tokens, word_enhance=self.word_enhance)
+            soft_lexicon = align_with_token(soft_lexicon, f_seq.tokens, word_enhance=self.word_enhance)
         ids, weights = self.postproc_func(soft_lexicon)
-        train_feature.softlexicon_ids = self.format_soft_seq(ids)
-        train_feature.softlexicon_weights = self.format_soft_seq(weights, type='weight')
-        return train_feature
-
-    def build_tf_feature(self, feature):
-        tf_feature = super().build_tf_feature(feature)
-        # flatten to 1 dimension
-        tf_feature['softlexicon_ids'] = self.int_feature(list(chain(*feature.softlexicon_ids)))
-        tf_feature['softlexicon_weights'] = self.float_feature(list(chain(*feature.softlexicon_weights)))
-        return tf_feature
+        f_seq.softlexicon_ids = self.format_soft_seq(ids)
+        f_seq.softlexicon_weights = self.format_soft_seq(weights, type='weight')
+        return f_seq
 
     def build_data_params(self, n_sample):
         # pass in pretrain model vocab Embedding
