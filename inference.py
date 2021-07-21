@@ -43,11 +43,14 @@ class InferHelper(object):
         self.server = server
         self.version = version
         self.timeout = timeout
+        self.channel = None
+        self.stub = None
+        self.init()
 
-    def get_stub(self):
-        channel = grpc.insecure_channel(self.server)
-        stub = prediction_service_pb2_grpc.PredictionServiceStub(channel)
-        return stub
+    def init(self):
+        # This is for channel stub reuse
+        self.channel = grpc.insecure_channel(self.server)
+        self.stub = prediction_service_pb2_grpc.PredictionServiceStub(self.channel)
 
     def make_request(self, feature):
         request = predict_pb2.PredictRequest()
@@ -76,29 +79,38 @@ class InferHelper(object):
                     )
         return [tf_example.SerializeToString()]
 
-    @grpc_retry()
     def decode_prediction(self, resp):
         res = resp.result().outputs
         pred_ids = np.squeeze(tf.make_ndarray(res['pred_ids'])) # seq label ids
         entity = extract_entity(self.feature['tokens'], pred_ids, self.idx2tag)
         return entity
 
-    @timer
-    def infer(self, text):
-        stub = self.get_stub()
-        feature = self.make_feature(text)
-        req = self.make_request(feature)
-        resp = stub.Predict.future(req, self.timeout)
+    @grpc_retry()
+    def _infer(self, req):
+        resp = self.stub.Predict.future(req, self.timeout)
         output = self.decode_prediction(resp)
         return output
 
+    @timer
+    def infer(self, text):
+        feature = self.make_feature(text)
+        req = self.make_request(feature)
+        output = self._infer(req)
+        return output
 
-# create singleton for inference, trigger all lazy eval before online inference
-infer_handle = InferHelper(MAX_SEQ_LEN, TAG2IDX, MODEL, VERSION, SERVER, timeout=TIMEOUT)
+infer_handle = None
+
+
+def init_client():
+    global infer_handle
+    # For multiprocessing client, call init after fork
+    infer_handle = InferHelper(MAX_SEQ_LEN, TAG2IDX, MODEL, VERSION, SERVER, timeout=TIMEOUT)
 
 
 if __name__ == '__main__':
     print('\n Input text for inference, press Enter when finished \n')
+    init_client()
     while True:
         text = input('Input Text: ')
         print(infer_handle.infer(text))
+
