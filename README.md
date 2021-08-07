@@ -83,3 +83,5 @@ python inference.py
 
 [中文NER的那些事儿3. SoftLexicon等词汇增强详解&代码实现 ](https://www.cnblogs.com/gogoSandy/p/14965711.html)
 
+[tensorflow踩坑合集2. TF Serving & gRPC 踩坑](https://www.cnblogs.com/gogoSandy/p/15106953.html)
+
