@@ -1,5 +1,7 @@
 # 中文NER的那些事儿
 
+The code is not rigorously tested, if you find a bug, welcome PR ^_^ ~
+
 ### 支持模型
 1. 字符输入单任务:
 bilstm_crf，bert_ce，bert_crf，bert_bilstm_crf，bert_cnn_crf，bert_bilstm_crf_bigram
