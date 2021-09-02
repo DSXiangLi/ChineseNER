@@ -83,7 +83,7 @@ class VocabModel(object):
 
 # Singleton to avoid multiple loading
 ctb50_handler = VocabModel(model_dir='pretrain_model.ctb50', model_name='ctb50')
-bigiga50_handler = VocabModel(model_dir=git'pretrain_model.giga_bichar', model_name='giga_bichar')
+bigiga50_handler = VocabModel(model_dir='pretrain_model.giga_bichar', model_name='giga_bichar')
 
 
 def align_with_token(idx_list, tokens, word_enhance):
