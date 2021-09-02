@@ -7,7 +7,7 @@ The code is not rigorously tested, if you find a bug, welcome PR ^_^ ~
 bilstm_crf，bert_ce，bert_crf，bert_bilstm_crf，bert_cnn_crf，bert_bilstm_crf_bigram
   
 2. 词汇增强:
-bilstm_crf_softword，bilstm_crf_ex_softword，bilstm_crf_softlexicon
+bilstm_crf_softword，bilstm_crf_ex_softword，bilstm_crf_softlexicon, bilstm_crf_bichar
 
 3. 多任务
 - bert_bilstm_crf_mtl: 共享Bert的多任务联合学习
