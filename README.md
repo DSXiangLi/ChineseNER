@@ -1,5 +1,7 @@
 # 中文NER的那些事儿
 
+The code is not rigorously tested, if you find a bug, welcome PR ^_^ ~
+
 ### 支持模型
 1. 字符输入单任务:
 bilstm_crf，bert_ce，bert_crf，bert_bilstm_crf，bert_cnn_crf，bert_bilstm_crf_bigram
@@ -82,4 +84,6 @@ python inference.py
 [中文NER的那些事儿2. 多任务，对抗迁移学习详解&代码实现](https://www.cnblogs.com/gogoSandy/p/14773792.html)
 
 [中文NER的那些事儿3. SoftLexicon等词汇增强详解&代码实现 ](https://www.cnblogs.com/gogoSandy/p/14965711.html)
+
+[tensorflow踩坑合集2. TF Serving & gRPC 踩坑](https://www.cnblogs.com/gogoSandy/p/15106953.html)
 
