@@ -7,8 +7,8 @@ from itertools import chain
 from functools import partial
 import importlib
 from data.word_enhance import (align_with_token, build_softword, build_ex_softword, build_soft_lexicon,
-                               WordEnhanceMethod, SoftWord, SoftLexicon, ExSoftWord,
-                               Soft2Idx, MaxLexiconLen, model_init,
+                               WordEnhanceMethod, SoftWord, SoftLexicon, ExSoftWord, BiChar, build_bichar,
+                               Soft2Idx, MaxLexiconLen, bigiga50_handler, ctb50_handler,
                                postproc_soft_lexicon, prebuild_weight)
 from data.tokenizer import TokenizerGiga, TokenizerBert
 
@@ -25,7 +25,7 @@ def extract_prefix_surfix(model_name):
     1. model_name start with bert use bert tokenizer
     2. model_name end with word enhance use word enhance
     """
-    word_enhance = re.search('({})|({})|({})'.format(SoftWord, SoftLexicon, ExSoftWord), model_name)
+    word_enhance = re.search('({})|({})|({})|({})'.format(SoftWord, SoftLexicon, ExSoftWord, BiChar), model_name)
     word_enhance = word_enhance.group() if word_enhance else None
 
     tokenizer_type = re.search('({})'.format(TokenizerBert), model_name)
@@ -57,6 +57,10 @@ def get_feature_poroto(max_seq_len, word_enhance=None):
         feature_proto.update({
             'ex_softword_ids': tf.io.FixedLenFeature([max_seq_len*len(Soft2Idx)], dtype=tf.int64)
         })
+    elif word_enhance == BiChar:
+        feature_proto.update({
+            'bichar_ids': tf.io.FixedLenFeature([max_seq_len], dtype=tf.int64)
+        })
     else:
         #rm None from Soft2Idx
         feature_proto.update({
@@ -74,11 +78,12 @@ def get_instance(tokenizer_type, max_seq_len, tag2idx, mapping=None, word_enhanc
     if word_enhance is None:
         cls = BasicProc
     else:
-        model_init() # run lazy variable loading
         if word_enhance == SoftWord:
             cls = SoftwordProc
         elif word_enhance == ExSoftWord:
             cls = ExSoftwordProc
+        elif word_enhance == BiChar:
+            cls = BicharProc
         else:
             cls = SoftLexiconProc
 
@@ -121,6 +126,7 @@ FeatureSchema = {
     'label_ids': tf_int_feature,
     'seq_len': tf_int_feature,
     'softword_ids': tf_int_feature,
+    'bichar_ids': tf_int_feature,
     'ex_softword_ids': tf_int_feature,
     'softlexicon_ids': tf_int_feature,
     'softlexicon_weights': tf_float_feature,
@@ -235,6 +241,7 @@ class BasicProc(object):
                     )
                     writer.write(example.SerializeToString())
                 except Exception as e:
+                    print(e)
                     n_invalid_sample+=1
 
         print('Dump {} sample, invalid_sample = {}'.format(n_sample, n_invalid_sample))
@@ -248,6 +255,45 @@ class BasicProc(object):
 ####################################
 # Following are word enhance class #
 ####################################
+
+
+class BicharProc(BasicProc):
+    def __init__(self, tokenizer_type, max_seq_len, tag2idx, mapping):
+        super(BicharProc, self).__init__(tokenizer_type, max_seq_len, tag2idx, mapping)
+        self.word_enhance = BiChar
+        bigiga50_handler.init()
+
+    def format_soft_seq(self, seq):
+        default_label_encoding = bigiga50_handler.vocab2idx[bigiga50_handler.pad_token]
+        if self.tokenizer_type == TokenizerBert:
+            seq = seq[:(self.max_seq_len - 2)]
+            seq = [default_label_encoding] + seq + [default_label_encoding]
+        else:
+            seq = seq[:self.max_seq_len]
+        len_seq = len(seq)
+
+        seq += [default_label_encoding] * (self.max_seq_len - len_seq)
+        return seq
+
+    def build_seq_feature(self, sentence):
+        """
+        Add additional softword ids into sequence feature
+        """
+        f_seq = super().build_seq_feature(sentence)
+        bichar_ids = build_bichar(sentence, False)
+        if self.tokenizer_type == TokenizerBert:
+            # for character tokenizer, no need to align with tokenizer
+            bichar_ids = align_with_token(bichar_ids, f_seq.tokens, word_enhance=self.word_enhance)
+        bichar_ids = self.format_soft_seq(bichar_ids)
+        f_seq.bichar_ids = bichar_ids
+        return f_seq
+
+    def build_data_params(self, n_sample):
+        params = super().build_data_params(n_sample)
+        params['bichar_embedding'] = bigiga50_handler.vocab_embedding
+        params['word_enhance_dim'] = bigiga50_handler.embedding_dim
+        params['vocab2idx'] = bigiga50_handler.vocab2idx
+        return params
 
 
 class SoftwordProc(BasicProc):
@@ -331,15 +377,14 @@ class SoftLexiconProc(BasicProc):
         super(SoftLexiconProc, self).__init__(tokenizer_type, max_seq_len, tag2idx, mapping)
         self.word_enhance = SoftLexicon # surfix = word enhance method
         self.soft2idx=Soft2Idx
-        model_init() # Only used when cls is init outside get_instance
+        ctb50_handler.init()
         self.default_weight = default_weight # True will use pretrain model vocabFreq, otherwise calculate by input data
         self.postproc_func = self.init_weight()
 
     def init_weight(self):
         if self.default_weight:
             print('Using default vocab frequency from pretrain model')
-            vocabfreq = getattr(importlib.import_module('data.word_enhance'), 'VocabFreq')
-            return partial(postproc_soft_lexicon, vocabfreq=vocabfreq)
+            return partial(postproc_soft_lexicon, vocabfreq=ctb50_handler.vocab_freq)
         # calculate weight for softlexion using training data
         if self.rename_file == 'train':
             prebuild_weight(self.data_dir, self.sentence_list)
@@ -347,13 +392,6 @@ class SoftLexiconProc(BasicProc):
         with open(os.path.join(self.data_dir,'lexicon_weight.pkl'), 'rb') as f:
             self.vocabfreq = pickle.load(f)
         return partial(postproc_soft_lexicon, vocabfreq=self.vocabfreq)
-
-    @property
-    def vocab2idx(self):
-        # use lazy import and make sure model_init run ahead
-        vocab2idx = getattr(importlib.import_module('data.word_enhance'), 'Vocab2IDX')
-        assert vocab2idx, 'Soft2Idx is None, to use word enhance cls, run model_init first'
-        return vocab2idx
 
     def format_soft_seq(self, seq, type='ids'):
         if type == 'weight':
@@ -392,9 +430,9 @@ class SoftLexiconProc(BasicProc):
         # pass in pretrain model vocab Embedding
         params = super().build_data_params(n_sample)
         params['soft2idx'] = self.soft2idx
-        params['vocab2idx'] = self.vocab2idx
         params['word_enhance_dim'] = len(self.soft2idx)-1 # 4=B/M/E/S
         params['max_lexicon_len'] = MaxLexiconLen
-        params['word_embedding'] = getattr(importlib.import_module('data.word_enhance'), 'VocabEmbedding')
+        params['vocab2idx'] = ctb50_handler.vocab2idx
+        params['word_embedding'] = ctb50_handler.vocab_embedding
         return params
 

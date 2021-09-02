@@ -27,51 +27,63 @@ Soft2Idx={
 SoftWord = 'softword'
 ExSoftWord = 'ex_softword'
 SoftLexicon = 'softlexicon'
-WordEnhanceMethod = [SoftWord, ExSoftWord, SoftLexicon]
-
-# word enhance constant
+BiChar = 'bichar'
+WordEnhanceMethod = [SoftWord, ExSoftWord, SoftLexicon, BiChar]
 MaxWordLen = 10
 MaxLexiconLen = 10  # only keep topn words for soft lexicon
-NONE_TOKEN= '<None>'
-PAD_TOKEN= '<PAD>'
-PretrainModel = 'pretrain_model.ctb50' # algin with the lattice and softlexicon
-
-# Lazy Eval Global Variable
-model = None
-Vocab2IDX = None
-VocabFreq = None
-N_word = None
-VocabEmbedding = None
 
 
-def model_init():
-    # lazy load all model and embedding needed for word enhance
-    global model, VocabFreq, Vocab2IDX, VocabEmbedding, N_word
-    jieba.initialize() # global initialization
-    if model is None:
-        print('loading w2v pretrain model {}.It is very very slow, please be patient~~'.format(
-            PretrainModel))
-        # ctb50/giga are both in glove format, converter is done in __init__
-        model = getattr(importlib.import_module(PretrainModel), 'model')
-    if Vocab2IDX is None:
-        print('Building Vocabulary ...')
-        Vocab2IDX = dict([(word, idx) for idx, word in enumerate(model.index2word)])
-        VocabFreq = dict([(Vocab2IDX[word], model.wv.vocab[word].count) for word in model.index2word])
-        N_word = len(VocabFreq)
-        Vocab2IDX.update({
-            NONE_TOKEN: N_word,
-            PAD_TOKEN: N_word+1
+class VocabModel(object):
+    def __init__(self, model_dir, model_name):
+        self.loaded = False
+        self.name = model_name
+        self.model_dir = model_dir # here model must have gensim model format
+        self.none_token = '<None>' # none in lexicon and unk in word lookup
+        self.eos_token = '<eos>'
+        self.pad_token = '<PAD>'
+        self.addon_num = 4
+        self.model = None
+
+    def init(self):
+        print('Initializing model and vocab ')
+        if not self.model:
+            self.model = getattr(importlib.import_module(self.model_dir), 'model')
+            self._build_vocab()
+            self._build_embedding()
+
+    def _build_vocab(self):
+        self.vocab2idx = dict([(word, idx) for idx, word in enumerate(self.model.index2word)])
+        self.vocab_freq = dict(
+            [(self.vocab2idx[word], self.model.wv.vocab[word].count) for word in self.model.index2word])
+        self.n_word = len(self.vocab_freq)
+        self._addon_token()
+
+    def _addon_token(self):
+        self.vocab2idx.update({
+            self.none_token: self.n_word,
+            self.pad_token: self.n_word + 1,
+            self.eos_token: self.n_word + 2
         })
-        VocabFreq.update({
-            Vocab2IDX[NONE_TOKEN]: 1,
-            Vocab2IDX[PAD_TOKEN]: 0
+        self.vocab_freq.update({
+            self.vocab2idx[self.none_token]: 1,
+            self.vocab2idx[self.pad_token]: 0
         })
-    if VocabEmbedding is None:
-        VocabEmbedding = np.vstack((np.array(model.vectors),
-                                    np.random.normal(0, 1, size=(model.vector_size)), # None Token
-                                    np.zeros(model.vector_size) # Pad Token
-                                    )).astype(np.float32)
-        VocabEmbedding = np.apply_along_axis(normalize, 1, VocabEmbedding)
+
+    def _build_embedding(self):
+        self.vocab_embedding = np.vstack((np.array(self.model.vectors),
+                                          # random init for None/pad/eos ... tokens
+                                         np.random.normal(0, self.addon_num, size=(self.model.vector_size))
+                                         )).astype(np.float32)
+        self.vocab_embedding = np.apply_along_axis(normalize, 1, self.vocab_embedding)
+
+    @property
+    def embedding_dim(self):
+        return self.model.vector_size
+
+
+# Singleton to avoid multiple loading
+ctb50_handler = VocabModel(model_dir='pretrain_model.ctb50', model_name='ctb50')
+bigiga50_handler = VocabModel(model_dir=git'pretrain_model.giga_bichar', model_name='giga_bichar')
 
 
 def align_with_token(idx_list, tokens, word_enhance):
@@ -90,6 +102,8 @@ def align_with_token(idx_list, tokens, word_enhance):
         combine_func = combine_ex_softword
     elif word_enhance == SoftLexicon:
         combine_func = combine_soft_lexicon
+    elif word_enhance == BiChar:
+        combine_func = combine_bichar
     else:
         raise ValueError('idx type only supprt {}'.format(','.join(WordEnhanceMethod)))
 
@@ -103,6 +117,13 @@ def align_with_token(idx_list, tokens, word_enhance):
         pos += tl
     assert len(output_list) == len(token_len)
     return output_list
+
+
+def combine_bichar(idx_list):
+    """
+    Bichar: when bert tokenizer is not token, use lower bichar_id, lower id has higher frequency
+    """
+    return min(idx_list)
 
 
 def combine_softword(idx_list):
@@ -158,7 +179,7 @@ def postproc_soft_lexicon(output_list, vocabfreq):
         n = len(ids)
         if n <= MaxLexiconLen:
             # pad with PAD
-            ids = list(ids) + [Vocab2IDX[PAD_TOKEN]] * (MaxLexiconLen -n)
+            ids = list(ids) + [ctb50_handler.vocab2idx[ctb50_handler.pad_token]] * (MaxLexiconLen -n)
             weight = [vocabfreq.get(i, 1) for i in ids ]
             return ids, weight
         else:
@@ -184,11 +205,39 @@ def postproc_soft_lexicon(output_list, vocabfreq):
     return seq_ids, seq_weights
 
 
+def build_bichar(sentence, verbose=False):
+    """
+    Input: raw sentence
+    Output: same length as sentence, using bigram [t, t+1] to look up bigram embedding
+    """
+    bichar_ids = []
+    sentence = sentence.replace(' ', '')
+    for i, token in enumerate(sentence):
+        if i != len(sentence)-1:
+            bichar = sentence[i:i+2]
+            if bichar in bigiga50_handler.vocab2idx:
+                bichar_ids.append(bigiga50_handler.vocab2idx[bichar])
+            else:
+                bichar_ids.append(bigiga50_handler.vocab2idx[bigiga50_handler.none_token])
+        else:
+            bichar_ids.append(bigiga50_handler.vocab2idx[bigiga50_handler.eos_token])
+
+    assert len(bichar_ids) == len(sentence), 'Bichar len={} != sentence len={}'.format(
+        len(bichar_ids), len(sentence)
+    )
+    if verbose:
+        print(sentence)
+        print(bichar_ids)
+
+    return bichar_ids
+
+
 def build_softword(sentence, verbose=False):
     """
     Input: raw sentence
     Output: same length as sentence, using word cut result from jieba
     """
+    jieba.initialize()
     softword_index = []
     sentence = sentence.replace(' ','') # remove ' ' space in sentence
     words = jieba.cut(sentence)
@@ -221,7 +270,7 @@ def build_ex_softword(sentence, verbose=False):
     for i in range(len(sentence)):
         for j in range(i, min(i+MaxWordLen, len(sentence))):
             word = sentence[i:(j+1)]
-            if word in Vocab2IDX:
+            if word in ctb50_handler.vocab2idx:
                 if j-i==0:
                     ex_softword_index[i].add('S')
                 elif j-i==1:
@@ -261,7 +310,7 @@ def build_soft_lexicon(sentence, verbose=False):
     for i in range(len(sentence)):
         for j in range(i, min(i+MaxWordLen, len(sentence))):
             word = sentence[i:(j + 1)]
-            if word in Vocab2IDX:
+            if word in ctb50_handler.vocab2idx:
                 if j-i==0:
                     soft_lexicon[i]['S'].add(word)
                 elif j-i==1:
@@ -275,7 +324,7 @@ def build_soft_lexicon(sentence, verbose=False):
         for key, val in soft_lexicon[i].items():
             if not val:
                 # eg.no matching E soft lexicon, fill in with None Token
-                soft_lexicon[i][key].add(NONE_TOKEN)
+                soft_lexicon[i][key].add(ctb50_handler.none_token)
 
     if verbose:
         print(sentence)
@@ -283,7 +332,7 @@ def build_soft_lexicon(sentence, verbose=False):
 
     for lexicon in soft_lexicon:
         for key,val in lexicon.items():
-            lexicon[key] = [Vocab2IDX[i] for i in val]
+            lexicon[key] = [ctb50_handler.vocab2idx[i] for i in val]
 
     return soft_lexicon
 
@@ -309,7 +358,7 @@ if __name__ == '__main__':
     # pre build word frequency used by msra, people_daily
     test = False
     if test:
-        model_init()
+        ctb50_handler.init()
         from bert_base.bert import tokenization
         tokenizer = tokenization.FullTokenizer("./pretrain_model/ch_google/vocab.txt", do_lower_case=True)
         ## Test make feature
@@ -337,3 +386,8 @@ if __name__ == '__main__':
         r1 = build_soft_lexicon(s1, True)
         r2 = align_with_token(r1, tokenizer.tokenize(s1), 'soft_lexicon')
         ids, weight = postproc_soft_lexicon(r2)
+
+
+        bigiga50_handler.init()
+
+        build_bichar(s2, True)

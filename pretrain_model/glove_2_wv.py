@@ -12,7 +12,10 @@ def convert(model_name):
 
     glove_file = datapath(os.path.join(abs_path, model_name))
     tmp_file = get_tmpfile(os.path.join(abs_path, model_name + 'tmp'))
-    _ = glove2word2vec(glove_file, tmp_file)
+    if os.path.isfile(os.path.join(abs_path, tmp_file)):
+        print('Tmp file already existed, only generate tmp file 1 time')
+    else:
+        _ = glove2word2vec(glove_file, tmp_file)
 
     model = KeyedVectors.load_word2vec_format(tmp_file)
     return model
