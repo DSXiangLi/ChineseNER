@@ -113,6 +113,9 @@ def build_model_fn(model_name):
             if 'bert' in model_name:
                 train_op = bert_train_op(loss, params['lr'], params['num_train_steps'],
                                            params['warmup_ratio'], params['diff_lr_times'], True)
+            elif 'transformer' in model_name:
+                train_op = transformer_train_op(loss, params['lr'], params['num_train_steps'],
+                                         params['warmup_ratio'])
             else:
                 train_op = custom_train_op(loss, params['lr'], params['step_per_epoch'],
                                             params['decay_rate'])
@@ -163,6 +166,9 @@ def build_mtl_model_fn(model_name):
             if 'bert' in model_name:
                 train_op = bert_train_op(loss, params['lr'], params['num_train_steps'],
                                            params['warmup_ratio'], params['diff_lr_times'], True)
+            elif 'transformer' in model_name:
+                train_op = bert_train_op(loss, params['lr'], params['num_train_steps'],
+                                           params['warmup_ratio'], None, True)
             else:
                 train_op = custom_train_op(loss, params['lr'], params['num_train_steps'],
                                            params['decay_rate'])
@@ -191,6 +197,7 @@ def build_mtl_model_fn(model_name):
                                               export_outputs=output)
         return spec
     return model_fn
+
 
 
 def create_optimizer(init_lr, num_train_steps, num_warmup_steps, global_step):
@@ -300,6 +307,18 @@ def custom_train_op(loss, init_lr, step_per_epoch, decay_rate):
     return train_op
 
 
+def transformer_train_op(loss, init_lr, num_train_steps, warmup_ratio):
+    from tools.transformer.modules import noam_scheme
+    num_warmup_steps = int(num_train_steps * warmup_ratio)
+
+    global_step = tf.train.get_or_create_global_step()
+    lr = noam_scheme(init_lr, global_step, num_warmup_steps)
+    tf.summary.scalar('lr', lr)
+    optimizer = tf.train.AdamOptimizer(lr)
+    train_op = optimizer.minimize(loss, global_step=global_step)
+    return train_op
+
+
 def lr_decay(init_lr, step_per_epoch, decay_rate):
     global_step = tf.train.get_or_create_global_step()
 
@@ -326,3 +345,4 @@ def gradient_clipping(optimizer, cost):
                                          global_step=tf.train.get_global_step() )
 
     return train_op
+
