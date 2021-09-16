@@ -24,7 +24,7 @@ def singletask_train(args):
     input_pipe = NerDataset(data_dir, TRAIN_PARAMS['batch_size'], TRAIN_PARAMS['epoch_size'], model_name)
     TRAIN_PARAMS.update(input_pipe.params) # add label_size, max_seq_len, num_train_steps into train_params
     print('='*10+'TRAIN PARAMS'+'='*10)
-    print(TRAIN_PARAMS)
+    print(dict([(i,j )for i,j in TRAIN_PARAMS.items() if ('emb' not in i)  and ('vocab' not in i )]))
     print('='*10+'RUN PARAMS'+'='*10)
     print(RUN_CONFIG)
 

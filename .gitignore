@@ -6,6 +6,7 @@ pretrain_model/*/*.ckpt*
 pretrain_model/*/*.bz2
 pretrain_model/ctb50/*.vec
 pretrain_model/*/*.vectmp
+pretrain_model/*/*.vec
 */__pycache__/*
 */*/__pycache__/*
 __pycache__/

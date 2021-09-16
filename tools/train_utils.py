@@ -167,8 +167,8 @@ def build_mtl_model_fn(model_name):
                 train_op = bert_train_op(loss, params['lr'], params['num_train_steps'],
                                            params['warmup_ratio'], params['diff_lr_times'], True)
             elif 'transformer' in model_name:
-                train_op = bert_train_op(loss, params['lr'], params['num_train_steps'],
-                                           params['warmup_ratio'], None, True)
+                train_op = transformer_train_op(loss, params['lr'], params['num_train_steps'],
+                                         params['warmup_ratio'])
             else:
                 train_op = custom_train_op(loss, params['lr'], params['num_train_steps'],
                                            params['decay_rate'])
