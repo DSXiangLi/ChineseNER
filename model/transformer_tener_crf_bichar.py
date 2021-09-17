@@ -42,7 +42,7 @@ def build_graph(features, labels, params, is_training):
 
     return crf_loss, pred_ids
 
-# below params from MSRA
+# below params from MSRA[smaller params: num_head=5/d_model=200 for people_daily]
 TRANSFORMER_PARAMS = {
     'num_head': 10, # giga embedding size is 50, must be divided by 5
     'd_model': 400,  # giga char& bichar embedding dim are small, project to bigger dim
