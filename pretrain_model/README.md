@@ -24,3 +24,7 @@
 5. ctb50: Word(Lattice) embeddings (ctb.50d.vec)
 - 模型链接：https://drive.google.com/file/d/1K_lG3FlXTgOOf8aQ4brR9g3R40qi1Chv/view
 - 项目链接：https://github.com/jiesutd/LatticeLSTM 复用LatticeLSTM
+
+6. lattice: 词向量和字符向量的组合用于FLAT Lattice任务 
+- 这里用的是ctb50和giga的组合，移除ctb50中的单字字符，和giga字符进行拼接，运行preprocess.py会得到output向量
+- model和以上模型文件相同都在__init__中由glove_2_wv得到
