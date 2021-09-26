@@ -339,6 +339,7 @@ class ExSoftwordProc(BasicProc):
         super(ExSoftwordProc, self).__init__(tokenizer_type, max_seq_len, tag2idx, mapping)
         self.word_enhance = ExSoftWord
         self.soft2idx = Soft2Idx
+        ctb50_handler.init()# init词表
 
     def format_soft_seq(self, seq):
         default_one_hot = [0] * len(self.soft2idx)
