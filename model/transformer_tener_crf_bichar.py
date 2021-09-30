@@ -18,9 +18,8 @@ def build_graph(features, labels, params, is_training):
         # Refer to TENER paper we concat char+bichar embedding.
         char_embedding = tf.nn.embedding_lookup(params['embedding'], input_ids)
         bichar_embedding = tf.nn.embedding_lookup(params['bichar_embedding'], bichar_ids)
-        char_embedding = embedding_project(char_embedding, params['d_model']//2)
-        bichar_embedding = embedding_project(bichar_embedding, params['d_model']//2)
         embedding = tf.concat([char_embedding, bichar_embedding], axis=-1)
+        embedding = embedding_project(embedding, params['d_model'])
         embedding = tf.layers.dropout(embedding, seed=1234, rate=params['embedding_dropout'],
                                       training=is_training)
         add_layer_summary(embedding.name, embedding)
@@ -44,9 +43,9 @@ def build_graph(features, labels, params, is_training):
 
 # below params from MSRA[smaller params: num_head=5/d_model=200 for people_daily]
 TRANSFORMER_PARAMS = {
-    'num_head': 10, # giga embedding size is 50, must be divided by 5
-    'd_model': 400,  # giga char& bichar embedding dim are small, project to bigger dim
-    'ffn_hidden': 400,
+    'num_head': 8, # giga embedding size is 50, must be divided by 5
+    'd_model': 240,  # giga char& bichar embedding dim are small, project to bigger dim
+    'ffn_hidden': 240,
     'encode_layers': 2,
     'batch_size': 16,
     'wramup_ratio': 0.1,
