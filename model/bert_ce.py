@@ -27,7 +27,7 @@ def build_graph(features, labels, params, is_training):
                                         params['label_size'], params['max_seq_len'], params['dtype'])
     pred_ids = tf.argmax(logits, axis=-1)  # batch * max_seq
     if is_training:
-        pred2str = id2sequence(params['idx2tag'])
+        pred2str = map2sequence(params['idx2tag'])
         tf.summary.text('prediction', pred2str(pred_ids[0, :]))
 
     return loss, pred_ids

@@ -29,13 +29,21 @@ class FlipGradientBuilder(object):
 
 def token2sequence(tokens):
     """
-    convert list ot token_id to string, for inference and tf.summary
+    convert list ot tokens to string, for inference and tf.summary
     """
     token2str = lambda x: ' '.join([i.decode('utf-8') for i in x])
     return tf.py_func(token2str, [tokens], tf.string)
 
 
-def id2sequence(mapping):
+def id2sequence(ids):
+    """
+    convert list ot ids to string, for inference and tf.summary
+    """
+    id2str = lambda x: ' '.join([str(i) for i in x])
+    return tf.py_func(id2str, [ids], tf.string)
+
+
+def map2sequence(mapping):
     def helper(pred_ids):
         """
         convert list ot token_id to string, for inference and tf.summary

@@ -3,7 +3,7 @@ import os
 import numpy as np
 import tensorflow as tf
 from bert_base.bert import modeling
-from tools.train_utils import id2sequence
+from tools.train_utils import map2sequence
 from tools.utils import add_layer_summary
 
 
@@ -141,7 +141,7 @@ def crf_decode(logits, trans, seq_len, idx2tag, is_training, mask=None):
                                                 transition_params=trans,
                                                 sequence_length=seq_len)
         if is_training:
-            pred2str = id2sequence(idx2tag)
+            pred2str = map2sequence(idx2tag)
             if mask is None:
                 tf.summary.text('prediction', pred2str(pred_ids[0, :]))
             else:
