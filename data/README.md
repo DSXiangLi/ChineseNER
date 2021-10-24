@@ -5,3 +5,5 @@
 1. NER-MSRA
 2. NER-People Daily
 3. CWS-MSR
+4. NER-CLUENER
+5. NER-Weibo

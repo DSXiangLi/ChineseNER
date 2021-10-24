@@ -8,6 +8,7 @@ from tools.utils import normalize
 
 TokenizerBert = 'bert'
 TokenizerGiga = 'giga'
+TokenizerLattice = 'lattice'
 Tokenizers = [TokenizerGiga, TokenizerBert]
 
 
@@ -27,14 +28,25 @@ def get_giga_tokenizer(module='pretrain_model.giga'):
     """
     # giga tokenizer is used in all None bert model
     model = getattr(importlib.import_module(module), 'model') # convert glove to word2vec and return model
-    giga_tokenizer = GigaTokenizer(model)
+    tokenizer = TokenizerAdapter(model)
 
-    return giga_tokenizer
+    return tokenizer
 
 
-class GigaTokenizer(object):
+def get_lattice_tokenizer(module='pretrain_model.lattice'):
     """
-    Fake giga Tokenizer to has same interface as bert tokenizer
+    其实只是为了展平char+word放在同一个seq里面做embedding lookup。依旧只做字符分割，但index和embedding是bichar+unichar
+    Used in FLAT Lattice
+    """
+    model = getattr(importlib.import_module(module), 'model') # convert glove to word2vec and return model
+    tokenizer = TokenizerAdapter(model)
+
+    return tokenizer
+
+
+class TokenizerAdapter(object):
+    """
+    Fake Tokenizer to has same interface as bert(word piece) tokenizer
     """
     def __init__(self, model):
         self.model = model
@@ -88,12 +100,16 @@ class GigaTokenizer(object):
         return [self.vocab2idx[i] for i in tokens]
 
 
+
 if __name__ == '__main__':
     tokenizer = get_giga_tokenizer()
     s = '今天天气真好😔'
-    tokens = tokenizer.tokenize(s)
-    print(tokens )
-    tokens +=  ['[PAD]']
-    tokenids = tokenizer.convert_tokens_to_ids(tokens)
-    print(tokenids)
+    # tokens = tokenizer.tokenize(s)
+    # print(tokens )
+    # tokens +=  ['[PAD]']
+    # tokenids = tokenizer.convert_tokens_to_ids(tokens)
+    # print(tokenids)
 
+    tokenizer = get_lattice_tokenizer()
+    tokenizer.tokenize('今天天气真好')
+    tokenizer.convert_tokens_to_ids( tokenizer.tokenize('今天天气真好'))
