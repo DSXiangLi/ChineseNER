@@ -24,6 +24,7 @@ def build_graph(features, labels, params, is_training):
         bichar_embedding = tf.nn.embedding_lookup(params['bichar_embedding'], bichar_ids)
         embedding = tf.concat([char_embedding, bichar_embedding], axis=-1)
         embedding = embedding_project(embedding, params['d_model'])
+        embedding += get_pos_embedding(input_ids, pos_encoding, params['max_seq_len'])
         embedding = tf.layers.dropout(embedding, seed=1234, rate=params['embedding_dropout'],
                                       training=is_training)
         add_layer_summary(embedding.name, embedding)
@@ -46,11 +47,12 @@ def build_graph(features, labels, params, is_training):
 
     return crf_loss, pred_ids
 
-# below params from MSRA
+# below params from MSRA. here num_head and d_model are set small to compare with FLAT[too big can cause OOM]
+# Increase d_model & num_head can increase F1 by 3~4%
 TRANSFORMER_PARAMS = {
     'num_head': 8, # giga embedding size is 50, must be divided by 5
-    'd_model': 240,  # giga char& bichar embedding dim are small, project to bigger dim
-    'ffn_hidden': 240,
+    'd_model': 160,  # giga char& bichar embedding dim are small, project to bigger dim
+    'ffn_hidden': 160,
     'encode_layers': 2,
     'batch_size': 16,
     'wramup_ratio': 0.1,

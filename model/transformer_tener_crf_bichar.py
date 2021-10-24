@@ -44,8 +44,8 @@ def build_graph(features, labels, params, is_training):
 # below params from MSRA[smaller params: num_head=5/d_model=200 for people_daily]
 TRANSFORMER_PARAMS = {
     'num_head': 8, # giga embedding size is 50, must be divided by 5
-    'd_model': 240,  # giga char& bichar embedding dim are small, project to bigger dim
-    'ffn_hidden': 240,
+    'd_model': 160,  # giga char& bichar embedding dim are small, project to bigger dim
+    'ffn_hidden': 160,
     'encode_layers': 2,
     'batch_size': 16,
     'wramup_ratio': 0.1,
