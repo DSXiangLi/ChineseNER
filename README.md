@@ -16,6 +16,8 @@ bilstm_crf_softword，bilstm_crf_ex_softword，bilstm_crf_softlexicon, bilstm_cr
 4. Transformer结构：默认用bichar输入
 transformer_crf_bichar, transformer_tener_crf_bichar
 
+5. 数据增强：data/people_daily_augment
+
 ### 训练&评估
 1. pretrain_model中下载对应预训练模型到对应Folder，具体详见Folder中README.md
 2. data中运行对应数据集preprocess.py得到tfrecord和data_params，训练会根据model_name选择以下tokenizer生成的tfrecord
