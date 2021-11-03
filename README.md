@@ -92,3 +92,4 @@ python inference.py
 
 [tensorflow踩坑合集2. TF Serving & gRPC 踩坑](https://www.cnblogs.com/gogoSandy/p/15106953.html)
 
+[中文NER的那些事儿4. 数据增强在NER的尝试](https://www.cnblogs.com/gogoSandy/p/15502087.html)
