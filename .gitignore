@@ -1,4 +1,3 @@
-checkpoint/*
 data/*/*.tfrecord
 .DS_Store
 .idea/
