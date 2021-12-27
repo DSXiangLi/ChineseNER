@@ -1,0 +1,17 @@
+2021-12-25 19:03:05,696 - train - INFO - ==========Train Parameters==========
+2021-12-25 19:03:05,696 - train - INFO - {'dtype': tf.float32, 'lr': 5e-06, 'log_steps': 100, 'pretrain_dir': './pretrain_model/ch_google', 'batch_size': 32, 'epoch_size': 40, 'embedding_dropout': 0.2, 'warmup_ratio': 0.1, 'early_stop_ratio': 2, 'max_seq_len': 170, 'label_size': 3, 'start_weight': 1, 'end_weight': 1, 'span_weight': 0.1, 'span_hidden_size': 1536, 'span_dropout': 0.1, 'diff_lr_times': {'logits': 500}, 'n_samples': 126000, 'steps_per_epoch': 3937, 'num_train_steps': 157480}
+2021-12-25 19:03:05,696 - train - INFO - ==========Train MRC for msra==========
+2021-12-26 08:05:00,583 - train - INFO - Run Evaluation
+2021-12-26 08:06:21,147 - train - INFO - Dumping prediction at ./data/msra/MRC_predict.pkl
+2021-12-26 08:06:21,308 - train - INFO - Extracting Entity. Dumpping at ./data/msra/MRC_entity_predict.txt
+2021-12-26 08:06:22,281 - train - INFO - Running Span Level Evaluation. Writting to train.log in checkpoint
+2021-12-26 08:06:31,304 - train - INFO -               precision    recall  f1-score   support
+
+         LOC       0.95      0.92      0.93      2763
+         ORG       0.82      0.89      0.86      1263
+         PER       0.97      0.97      0.97      1367
+
+   micro avg       0.92      0.92      0.92      5393
+   macro avg       0.91      0.93      0.92      5393
+weighted avg       0.92      0.92      0.92      5393
+
