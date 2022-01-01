@@ -223,11 +223,17 @@ if __name__ == '__main__':
     data_dir = './data/people_daily'
     file_name = 'train'
     from data.people_daily.preprocess import load_data
+    from data.people_daily_augment.augment_mlm import MlmSR
 
     ner_handler = EntityReplace('./data/people_daily_augment/extra_ner_dict.pkl', max_sample=3, change_rate=0.2)
     synom_handler = SynomReplace('pretrain_model.ctb50', max_sample=3, change_rate=0.1)
     sent_handler = SentenceShuffle(max_sample=3, change_rate=0.3)
+    mlm_handler = MlmSR(max_sample=3, change_rate=0.2)
     augment(data_dir, file_name, load_data, [ner_handler.gen_sample,
                                              synom_handler.gen_sample,
                                              sent_handler.gen_sample,
+                                             mlm_handler.gen_sample
                                              ])
+
+    with open('./data/people_daily/train_augment.pkl','rb') as f:
+        data = pickle.load(f)
