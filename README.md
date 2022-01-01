@@ -16,7 +16,7 @@ bilstm_crf_softword，bilstm_crf_ex_softword，bilstm_crf_softlexicon, bilstm_cr
 4. Transformer结构：默认用bichar输入
 transformer_crf_bichar, transformer_tener_crf_bichar
 
-5. 数据增强：data/people_daily_augment
+5. 数据增强：data/people_daily_augment，支持实体替换，Bert MASK替换，句子shuffle，同义词替换
 
 6. MRC框架 + BIO Tagging Schema
 
