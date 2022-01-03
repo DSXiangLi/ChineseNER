@@ -90,12 +90,9 @@ def main(args):
         logger.info('Dumping prediction at {}'.format('./data/{}/{}_predict.pkl'.format(args.data, model_name)))
         with open('{}/{}_predict.pkl'.format(data_dir, model_name), 'wb') as f:
             pickle.dump(predictions, f)
-        #
-        with open('./data/msra/MRC_V3_predict.pkl', 'rb') as f:
-            predictions = pickle.load(f)
 
         ## Extract Entity
-        logger.info('Extracting Entity. Dumpping at {}'.format('{}/{}_entity_predict.txt'.format(data_dir, model_name)))
+        logger.info('Extracting Entity. Dumping at {}'.format('{}/{}_entity_predict.txt'.format(data_dir, model_name)))
         result = []
         for pred, sample, in zip(predictions, input_pipe.samples):
             pred_ids = np.argmax(pred['probs'], axis=-1) * pred['text_mask']
