@@ -1,5 +1,6 @@
 # -*-coding:utf-8 -*-
 import os
+from glob import glob
 import numpy as np
 import shutil
 import tensorflow as tf
@@ -45,7 +46,9 @@ def build_estimator(params, model_dir, model_fn, gpu_enable, RUN_CONFIG):
         save_checkpoints_steps=RUN_CONFIG['save_steps'],
         session_config=session_config, eval_distribute=None
     )
-    if os.path.isdir(model_dir):
+    if not model_dir:
+        warm_start_dir = None
+    elif glob(os.path.join(model_dir, '*ckpt*')):
         warm_start_dir = model_dir
     else:
         warm_start_dir = None

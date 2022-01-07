@@ -7,6 +7,41 @@ from bert_base.bert import modeling
 from bert_base.bert.optimization import AdamWeightDecayOptimizer
 from itertools import chain
 from tools.utils import get_log_hook
+from collections import namedtuple
+from typing import List
+
+
+class AddonParser(object):
+    """
+    Add Model Specific additional parser and argument
+    """
+    Hp = namedtuple('AddonHP', ['field', 'default', 'action'])
+
+    @staticmethod
+    def hp(field, default, action=lambda x: x):
+        # add default field value, python>3.8 namedtuple will have default ops
+        return AddonParser.Hp(field, default, action)
+
+    def __init__(self, hp_list: List[namedtuple]):
+        self.hp_list = hp_list
+
+    def append(self, parser):
+        for i in self.hp_list:
+            parser.add_argument("--" + i.field, default=i.default, type=type(i.default))
+        return parser
+
+    def update(self, params, args):
+        args = vars(args)
+        for i in self.hp_list:
+            params[i.field] = i.action(args[i.field])
+        return params
+
+    def parse(self, args):
+        params = {}
+        args = vars(args)
+        for i in self.hp_list:
+            params[i.field] = i.action(args[i.field])
+        return params
 
 
 class FlipGradientBuilder(object):
