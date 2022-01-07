@@ -35,7 +35,8 @@ def build_graph(features, labels,  params, is_training):
     if labels is None:
         return None, probs, text_mask
 
-    loss = cross_entropy_loss_mask(logits, labels['label_ids'], text_mask)
+    loss_func = params['loss_func']
+    loss = loss_func(logits, labels['label_ids'], text_mask)
 
     return loss, probs, text_mask
 

@@ -12,6 +12,7 @@ from mrc.evaluation import bio_extract_entity
 from tools.utils import clear_model, build_estimator
 from tools.logger import getLogger
 from seqeval.metrics import classification_report as ner_cls_report
+from tools.loss import LossHP, LossFunc
 import numpy as np
 
 TP = {
@@ -34,9 +35,14 @@ EXPORT_DIR = './serving_model/{}'
 CKPT_DIR = './checkpoint/ner_{}_{}'
 DATA_DIR = './data/{}'
 
+
 def main(args):
     model_dir = CKPT_DIR.format('msra', model_name)
     data_dir = DATA_DIR.format(args.data)
+
+    # get loss function given args
+    loss_hp = loss_hp_parser.parse(args)
+    TP['loss_func'] = LossFunc[loss_name](**loss_hp)
 
     if args.clear_model:
         clear_model(model_dir)
@@ -125,6 +131,13 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', type=str, default='people_daily', help='which data to use[msra, people_daily]' )
+    parser.add_argument("--loss", default='ce', type=str, help='Choose[ce,gce,sce,boot,focal]')
+
+    # 导入Loss相关的hyper parameters
+    loss_name = parser.parse_known_args()[0].loss
+    loss_hp_parser = LossHP[loss_name]
+    parser = loss_hp_parser.append(parser)
+
     ##注意一下的argparse和外面main处理bool的方法不一样，感觉下面的方案更简洁一些
     parser.add_argument('--clear_model', action='store_true', default=False, help='Whether to clear existing model')
 
