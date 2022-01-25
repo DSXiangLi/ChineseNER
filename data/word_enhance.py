@@ -72,7 +72,7 @@ class VocabModel(object):
     def _build_embedding(self):
         self.vocab_embedding = np.vstack((np.array(self.model.vectors),
                                           # random init for None/pad/eos ... tokens
-                                         np.random.normal(0, self.addon_num, size=(self.model.vector_size))
+                                         np.random.normal(0, 1, size=(self.addon_num, self.model.vector_size))
                                          )).astype(np.float32)
         self.vocab_embedding = np.apply_along_axis(normalize, 1, self.vocab_embedding)
 
