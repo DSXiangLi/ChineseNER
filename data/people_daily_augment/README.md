@@ -4,7 +4,9 @@
 - Noising: 
   - swapping: swapping sentence position
   - substitution: substitute entity with same type entity
-- Paraphrasing: replace non-entity words with similar words
+- Paraphrasing: r
+  - eplace non-entity words with similar words
+  - Bert Mask LM 
 
 2. performance Improvement
 
