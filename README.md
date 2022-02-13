@@ -2,6 +2,8 @@
 
 The code is not rigorously tested, if you find a bug, welcome PR ^_^ ~
 
+版本和环境配置详见requirement.txt, 数据和预训练模型的下载链接在对应folder的README中～
+
 ### 支持模型
 1. 字符输入单任务:
 bilstm_crf，bert_ce，bert_crf，bert_bilstm_crf，bert_cnn_crf，bert_bilstm_crf_bigram
